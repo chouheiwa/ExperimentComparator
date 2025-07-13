@@ -1,0 +1,35 @@
+{
+  "name": "experiment-comparator",
+  "version": "1.0.0",
+  "description": "A modern desktop application for comparing machine learning model experiment results",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:build:debug": "tauri build --debug",
+    "tauri:build:release": "tauri build --no-bundle",
+    "build:win": "tauri build --target x86_64-pc-windows-msvc",
+    "build:mac": "tauri build --target universal-apple-darwin",
+    "build:linux": "tauri build --target x86_64-unknown-linux-gnu"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.0.0",
+    "@tauri-apps/api": "^1.5.0",
+    "antd": "^5.26.4",
+    "lucide-react": "^0.263.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^1.5.0",
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^4.0.3",
+    "typescript": "^5.0.2",
+    "vite": "^4.4.5"
+  }
+}
