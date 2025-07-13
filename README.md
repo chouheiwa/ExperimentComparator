@@ -35,7 +35,7 @@
 - **桌面框架**: Tauri 1.x
 - **后端语言**: Rust
 - **图像处理**: Rust image crate
-- **状态管理**: 自定义React Hooks
+- **状态管理**: Zustand + Immer
 - **构建工具**: Vite
 
 ## 📦 安装要求
@@ -157,7 +157,12 @@ ExperimentComparator/
 1. **前端组件**：在 `src/components/` 中添加新的React组件
 2. **后端API**：在 `src-tauri/src/main.rs` 中添加新的Tauri命令
 3. **类型定义**：在 `src/types/` 中添加TypeScript类型
-4. **状态管理**：在 `src/hooks/` 中扩展useAppState Hook
+4. **状态管理**：在 `src/store/` 中扩展Zustand store
+
+### 状态管理
+项目使用 **Zustand** 进行状态管理，提供了优秀的性能和开发体验。
+
+📖 **详细文档**: [STATE_MANAGEMENT.md](docs/STATE_MANAGEMENT.md)
 
 ### 代码规范
 

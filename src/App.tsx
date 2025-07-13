@@ -1,33 +1,67 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
-import { Layout, Steps, Alert, Spin, Typography, Row, Col } from 'antd';
-import { FolderOutlined, CheckCircleOutlined, BarChartOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { Layout, Steps, Alert, Spin, Typography, Row, Col, Switch, Space } from 'antd';
+import { FolderOutlined, CheckCircleOutlined, BarChartOutlined, DatabaseOutlined, EyeOutlined, TableOutlined } from '@ant-design/icons';
 import { ValidationResult, ComparisonResult, FolderData } from './types';
-import { useAppState } from './hooks/useAppState';
+import { 
+  useCurrentStep, 
+  useFolders, 
+  useValidationResult, 
+  useComparisonResults, 
+  useLoading, 
+  useError, 
+  useHistoryRecords,
+  useSetCurrentStep,
+  useSetFolders,
+  useSetValidationResult,
+  useSetComparisonResults,
+  useSetLoading,
+  useSetError,
+  useSetHistoryRecords,
+  useAddHistoryRecord,
+  useDeleteHistoryRecord,
+  useLoadHistoryRecord,
+  useResetState
+} from './store/appStore';
+import { useInitializeApp } from './hooks/useInitializeApp';
 import { getStepTitle } from './utils';
 import FolderSelection from './components/FolderSelection';
 import ValidationResults from './components/ValidationResults';
 import ComparisonView from './components/ComparisonView';
+import AnalysisView from './components/AnalysisView';
 import HistoryPanel from './components/HistoryPanel';
 
 const { Header, Content } = Layout;
 const { Title, Paragraph } = Typography;
 
 const App: React.FC = () => {
-  const {
-    state,
-    setCurrentStep,
-    setFolders,
-    setValidationResult,
-    setComparisonResults,
-    setLoading,
-    setError,
-    setHistoryRecords,
-    addHistoryRecord,
-    deleteHistoryRecord,
-    loadHistoryRecord,
-    resetState
-  } = useAppState();
+  // 初始化应用
+  useInitializeApp();
+  
+  // 本地状态
+  const [useAnalysisView, setUseAnalysisView] = useState(true);
+  
+  // 状态
+  const currentStep = useCurrentStep();
+  const folders = useFolders();
+  const validationResult = useValidationResult();
+  const comparisonResults = useComparisonResults();
+  const loading = useLoading();
+  const error = useError();
+  const historyRecords = useHistoryRecords();
+  
+  // 动作
+  const setCurrentStep = useSetCurrentStep();
+  const setFolders = useSetFolders();
+  const setValidationResult = useSetValidationResult();
+  const setComparisonResults = useSetComparisonResults();
+  const setLoading = useSetLoading();
+  const setError = useSetError();
+  const setHistoryRecords = useSetHistoryRecords();
+  const addHistoryRecord = useAddHistoryRecord();
+  const deleteHistoryRecord = useDeleteHistoryRecord();
+  const loadHistoryRecord = useLoadHistoryRecord();
+  const resetState = useResetState();
 
   const handleFoldersSelected = async (selectedFolders: FolderData) => {
     setFolders(selectedFolders);
@@ -48,28 +82,28 @@ const App: React.FC = () => {
   };
 
   const handleStartComparison = async () => {
-    if (!state.validationResult) return;
+    if (!validationResult) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      const comparisonData = state.folders.comparison.map(f => ({
+      const comparisonData = folders.comparison.map(f => ({
         name: f.name,
         path: f.path
       }));
       
       const results = await invoke<ComparisonResult[]>('calculate_comparisons', {
-        gtFolder: state.folders.gt,
-        myFolder: state.folders.my,
+        gtFolder: folders.gt,
+        myFolder: folders.my,
         comparisonFolders: comparisonData,
-        commonFiles: state.validationResult.common_files
+        commonFiles: validationResult.common_files
       });
       setComparisonResults(results);
       setCurrentStep('comparison');
       
       // 保存历史记录
-      addHistoryRecord(state.folders);
+      addHistoryRecord(folders);
     } catch (err) {
       setError(err as string);
     } finally {
@@ -82,7 +116,7 @@ const App: React.FC = () => {
   };
 
   const getCurrentStepIndex = () => {
-    switch (state.currentStep) {
+    switch (currentStep) {
       case 'folder-selection':
         return 0;
       case 'validation':
@@ -123,7 +157,7 @@ const App: React.FC = () => {
         }}>
           <DatabaseOutlined style={{ fontSize: '32px', color: '#1890ff', marginRight: '16px' }} />
           <Title level={2} style={{ margin: 0, color: '#333' }}>
-            数据选择对比工具
+            ExperimentComparator
           </Title>
         </div>
       </Header>
@@ -141,10 +175,10 @@ const App: React.FC = () => {
           style={{ marginBottom: '32px' }}
         />
 
-        {state.error && (
+        {error && (
           <Alert
             message="错误"
-            description={state.error}
+            description={error}
             type="error"
             closable
             onClose={() => setError(null)}
@@ -152,7 +186,7 @@ const App: React.FC = () => {
           />
         )}
 
-        <Spin spinning={state.loading} tip="处理中...">
+        <Spin spinning={loading} tip="处理中...">
           <div style={{ 
             backgroundColor: '#fff', 
             borderRadius: '8px', 
@@ -169,46 +203,69 @@ const App: React.FC = () => {
               gap: '8px'
             }}>
               {steps[getCurrentStepIndex()].icon}
-              {getStepTitle(state.currentStep)}
+              {getStepTitle(currentStep)}
             </div>
 
-            {state.currentStep === 'folder-selection' && (
+            {currentStep === 'folder-selection' && (
               <Row gutter={[24, 24]}>
                 <Col xs={24} lg={16}>
                   <FolderSelection
                     onFoldersSelected={handleFoldersSelected}
-                    loading={state.loading}
-                    folders={state.folders}
+                    loading={loading}
+                    folders={folders}
                   />
                 </Col>
                 <Col xs={24} lg={8}>
                   <HistoryPanel
-                    records={state.historyRecords}
+                    records={historyRecords}
                     onLoadRecord={loadHistoryRecord}
                     onDeleteRecord={deleteHistoryRecord}
                     onImportRecords={(records) => {
-                      setHistoryRecords([...records, ...state.historyRecords]);
+                      setHistoryRecords([...records, ...historyRecords]);
                     }}
-                    loading={state.loading}
+                    loading={loading}
                   />
                 </Col>
               </Row>
             )}
 
-            {state.currentStep === 'validation' && state.validationResult && (
+            {currentStep === 'validation' && validationResult && (
               <ValidationResults
-                result={state.validationResult}
+                result={validationResult}
                 onStartComparison={handleStartComparison}
                 onReset={handleReset}
-                loading={state.loading}
+                loading={loading}
               />
             )}
 
-            {state.currentStep === 'comparison' && state.comparisonResults.length > 0 && (
-              <ComparisonView
-                results={state.comparisonResults}
-                onReset={handleReset}
-              />
+            {currentStep === 'comparison' && comparisonResults.length > 0 && (
+              <div>
+                <div style={{ marginBottom: '16px', textAlign: 'center' }}>
+                  <Space align="center">
+                    <EyeOutlined />
+                    <span>浏览模式</span>
+                    <Switch
+                      checked={useAnalysisView}
+                      onChange={setUseAnalysisView}
+                      checkedChildren="分析"
+                      unCheckedChildren="详细"
+                    />
+                    <TableOutlined />
+                    <span>分析模式</span>
+                  </Space>
+                </div>
+                {useAnalysisView ? (
+                  <AnalysisView
+                    results={comparisonResults}
+                    onReset={handleReset}
+                  />
+                ) : (
+                  <ComparisonView
+                    results={comparisonResults}
+                    onReset={handleReset}
+                  />
+                )}
+              </div>
             )}
           </div>
         </Spin>
