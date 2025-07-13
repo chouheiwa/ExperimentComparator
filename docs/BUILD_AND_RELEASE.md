@@ -73,6 +73,19 @@
 
 ## 🔐 代码签名配置
 
+### 无签名打包 (默认)
+当前配置支持无签名打包，这对于开源项目是完全可行的：
+
+**优势:**
+- 无需 Apple 开发者账户（$99/年）
+- 构建流程简单
+- 适合个人和开源项目
+
+**用户体验:**
+- 用户需要右键打开应用或在系统设置中授权
+- 仅第一次运行需要授权
+- 功能完全不受影响
+
 ### macOS 代码签名
 如果你有Apple开发者账户，可以配置代码签名：
 
@@ -96,6 +109,26 @@
      }
    }
    ```
+
+### 从无签名升级到有签名
+如果将来想要添加代码签名：
+
+1. **注册 Apple Developer Program** ($99/年)
+2. **创建证书**：在 Apple Developer 门户创建分发证书
+3. **导出证书**：将证书导出为 .p12 文件
+4. **更新配置**：在 tauri.conf.json 中配置签名身份
+5. **设置 GitHub Secrets**：添加证书和密码到 GitHub
+
+### 测试无签名打包
+在本地测试无签名打包：
+
+```bash
+# 构建 DMG
+npm run tauri build -- --bundles dmg
+
+# 测试安装
+open src-tauri/target/release/bundle/dmg/ExperimentComparator_1.0.0_x64.dmg
+```
 
 ### Windows 代码签名
 如果你有代码签名证书：
@@ -124,17 +157,48 @@
 ### 自定义构建脚本
 可以在`package.json`中添加自定义脚本：
 
+**构建脚本说明：**
+- `tauri:build`: 完整构建，包含所有默认安装包
+- `tauri:build:debug`: 调试模式构建
+- `tauri:build:fast`: 快速构建，仅编译不打包（使用 `--bundles none`）
+- `build:win/mac/linux`: 针对特定平台的构建
+
 ```json
 {
   "scripts": {
     "tauri:build": "tauri build",
     "tauri:build:debug": "tauri build --debug",
-    "tauri:build:release": "tauri build --no-bundle",
+    "tauri:build:fast": "tauri build --bundles none",
     "build:win": "tauri build --target x86_64-pc-windows-msvc",
     "build:mac": "tauri build --target universal-apple-darwin",
     "build:linux": "tauri build --target x86_64-unknown-linux-gnu"
   }
 }
+```
+
+### bundles 参数说明
+Tauri 构建支持以下 bundles 参数：
+
+**可用的 bundle 格式：**
+- `deb`: Debian 包格式 (Linux)
+- `rpm`: RPM 包格式 (Linux)
+- `appimage`: AppImage 便携格式 (Linux)
+- `msi`: MSI 安装包 (Windows)
+- `app`: 应用程序包 (macOS)
+- `dmg`: DMG 镜像文件 (macOS)
+- `updater`: 更新器包 (所有平台)
+- `none`: 跳过打包过程
+
+**使用示例：**
+```bash
+# 仅构建 DMG 格式
+npm run tauri build -- --bundles dmg
+
+# 构建多种格式
+npm run tauri build -- --bundles deb,appimage
+
+# 跳过打包（仅编译测试）
+npm run tauri build -- --bundles none
 ```
 
 ### 条件编译
@@ -156,6 +220,7 @@
 1. **检查依赖**: 确保所有依赖都已正确安装
 2. **检查权限**: 确保GitHub Actions有足够的权限
 3. **检查配置**: 验证tauri.conf.json配置是否正确
+4. **参数错误**: 如果遇到 `--no-bundle` 参数错误，请使用 `--bundles none` 替代
 
 ### 文件大小过大
 1. **启用压缩**: 在bundle配置中启用压缩

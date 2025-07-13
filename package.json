@@ -11,7 +11,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "tauri:build:debug": "tauri build --debug",
-    "tauri:build:release": "tauri build --no-bundle",
+    "tauri:build:fast": "tauri build --bundles none",
     "build:win": "tauri build --target x86_64-pc-windows-msvc",
     "build:mac": "tauri build --target universal-apple-darwin",
     "build:linux": "tauri build --target x86_64-unknown-linux-gnu"

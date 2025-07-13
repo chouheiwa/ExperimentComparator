@@ -50,7 +50,13 @@
 - **macOS** 10.15+
 - **Linux** (Ubuntu 18.04+)
 
-## 🚀 快速开始
+## 📦 下载使用
+
+如果你只想使用应用程序，请从 [Releases](https://github.com/chouheiwa/ExperimentComparator/releases) 页面下载适合你操作系统的安装包。
+
+📖 **详细安装指南**: [INSTALLATION.md](docs/INSTALLATION.md)
+
+## 🚀 开发环境搭建
 
 ### 1. 克隆项目
 ```bash
