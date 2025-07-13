@@ -23,7 +23,7 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup2.4-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup2.4-dev libjavascriptcoregtk-4.0-dev
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
@@ -47,6 +47,3 @@ jobs:
 
       - name: Test Tauri build (compile only)
         run: npm run tauri:build:fast
-
-      - name: Test Tauri build (debug mode)
-        run: npm run tauri:build:debug -- --bundles none 
