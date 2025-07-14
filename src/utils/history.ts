@@ -9,10 +9,16 @@ export const generateId = (): string => {
 
 // 生成默认记录名称
 export const generateRecordName = (folders: FolderData): string => {
+  const originalName = folders.original ? folders.original.split('/').pop() || 'Original' : '';
   const gtName = folders.gt.split('/').pop() || 'GT';
   const myName = folders.my.split('/').pop() || 'My';
   const compCount = folders.comparison.length;
-  return `${gtName} vs ${myName} (+${compCount})`;
+  
+  if (originalName) {
+    return `${originalName}: ${gtName} vs ${myName} (+${compCount})`;
+  } else {
+    return `${gtName} vs ${myName} (+${compCount})`;
+  }
 };
 
 // 从本地存储读取历史记录
@@ -21,7 +27,7 @@ export const loadHistoryFromStorage = (): HistoryRecord[] => {
     const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
     if (stored) {
       const records = JSON.parse(stored);
-      // 处理向后兼容性：转换旧格式的comparison数据
+      // 处理向后兼容性：转换旧格式的comparison数据和添加missing original字段
       return records.map((record: any) => {
         if (record.folders.comparison.length > 0 && typeof record.folders.comparison[0] === 'string') {
           record.folders.comparison = record.folders.comparison.map((path: string, index: number) => ({
@@ -30,6 +36,12 @@ export const loadHistoryFromStorage = (): HistoryRecord[] => {
             path: path
           }));
         }
+        
+        // 为旧记录添加默认的original字段
+        if (!record.folders.original) {
+          record.folders.original = '';
+        }
+        
         return record;
       });
     }
@@ -100,6 +112,12 @@ export const importHistoryFromJson = (jsonString: string): HistoryRecord[] => {
           path: path
         }));
       }
+      
+      // 为旧记录添加默认的original字段
+      if (!record.folders.original) {
+        record.folders.original = '';
+      }
+      
       return record;
     });
     
@@ -120,8 +138,10 @@ export const isDuplicateFolders = (folders: FolderData, existingRecords: History
   return existingRecords.some(record => {
     const recordFolders = record.folders;
     
-    // 检查GT和我的实验数据路径是否相同
-    if (recordFolders.gt !== folders.gt || recordFolders.my !== folders.my) {
+    // 检查原始图片、GT和我的实验数据路径是否相同
+    if (recordFolders.original !== folders.original || 
+        recordFolders.gt !== folders.gt || 
+        recordFolders.my !== folders.my) {
       return false;
     }
     

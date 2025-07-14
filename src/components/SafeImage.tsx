@@ -27,13 +27,8 @@ const SafeImage: React.FC<SafeImageProps> = ({
         setLoading(true);
         setError(null);
         
-        // 调试信息
-        console.log('Original path:', src);
-        
         // 使用 convertFileSrc 转换路径
         const convertedSrc = convertFileSrc(src);
-        console.log('Converted path:', convertedSrc);
-        
         setImageSrc(convertedSrc);
         setLoading(false);
       } catch (err) {

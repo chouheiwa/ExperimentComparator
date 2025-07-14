@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Card, Button, Space, Tag, Alert, Row, Col, Typography, Input } from 'antd';
 import { DeleteOutlined, PlusOutlined, InboxOutlined, EditOutlined } from '@ant-design/icons';
 import { listen } from '@tauri-apps/api/event';
@@ -13,6 +13,7 @@ interface FolderSelectionProps {
   onFoldersSelected: (folders: FolderData) => void;
   loading: boolean;
   folders?: FolderData;
+  onMainFoldersChanged?: () => void; // 主要文件夹变化时清除历史记录ID
 }
 
 // 生成唯一ID
@@ -25,7 +26,8 @@ const generateDefaultName = (index: number): string => {
   return `对比数据 ${index + 1}`;
 };
 
-const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, loading, folders }) => {
+const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, loading, folders, onMainFoldersChanged }) => {
+  const [originalFolder, setOriginalFolder] = useState('');
   const [gtFolder, setGtFolder] = useState('');
   const [myFolder, setMyFolder] = useState('');
   const [comparisonFolders, setComparisonFolders] = useState<ComparisonFolder[]>([]);
@@ -34,9 +36,33 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
 
+  // 使用ref来确保拖放处理函数中能获取到最新的状态值
+  const originalFolderRef = useRef(originalFolder);
+  const gtFolderRef = useRef(gtFolder);
+  const myFolderRef = useRef(myFolder);
+  const comparisonFoldersRef = useRef(comparisonFolders);
+
+  // 保持refs与状态同步
+  useEffect(() => {
+    originalFolderRef.current = originalFolder;
+  }, [originalFolder]);
+
+  useEffect(() => {
+    gtFolderRef.current = gtFolder;
+  }, [gtFolder]);
+
+  useEffect(() => {
+    myFolderRef.current = myFolder;
+  }, [myFolder]);
+
+  useEffect(() => {
+    comparisonFoldersRef.current = comparisonFolders;
+  }, [comparisonFolders]);
+
   // 监听外部folders属性变化，同步更新本地状态
   useEffect(() => {
     if (folders) {
+      setOriginalFolder(folders.original);
       setGtFolder(folders.gt);
       setMyFolder(folders.my);
       setComparisonFolders(folders.comparison);
@@ -51,25 +77,34 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
     try {
       setError(null);
       
-      // 维护本地状态来跟踪填入进度
-      let currentGtFolder = gtFolder;
-      let currentMyFolder = myFolder;
-      let currentComparisonFolders = [...comparisonFolders];
+      // 获取最新的状态值（使用refs确保不会使用过时的闭包值）
+      let currentOriginalFolder = originalFolderRef.current;
+      let currentGtFolder = gtFolderRef.current;
+      let currentMyFolder = myFolderRef.current;
+      let currentComparisonFolders = [...comparisonFoldersRef.current];
+      let hasChanges = false;
       
       for (const path of paths) {
         // 检查是否为文件，如果是则获取其父目录
         const isFile = await invoke<boolean>('is_file', { path });
         const finalPath = isFile ? await dirname(path) : path;
 
-        // 按顺序填入：GT -> 我的实验数据 -> 对比数据
-        if (!currentGtFolder) {
+        // 按顺序填入：原始图片 -> GT -> 我的实验数据 -> 对比数据
+        // 只有当对应字段为空时才填入，不覆盖已有值
+        if (!currentOriginalFolder) {
+          currentOriginalFolder = finalPath;
+          setOriginalFolder(finalPath);
+          hasChanges = true;
+        } else if (!currentGtFolder) {
           currentGtFolder = finalPath;
           setGtFolder(finalPath);
+          hasChanges = true;
         } else if (!currentMyFolder) {
           currentMyFolder = finalPath;
           setMyFolder(finalPath);
+          hasChanges = true;
         } else {
-          // 添加到对比数据（避免重复）
+          // 所有必要字段都有值时，只添加到对比数据（避免重复）
           const existingPaths = currentComparisonFolders.map(f => f.path);
           if (!existingPaths.includes(finalPath)) {
             const newFolder: ComparisonFolder = {
@@ -79,13 +114,22 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
             };
             currentComparisonFolders.push(newFolder);
             setComparisonFolders([...currentComparisonFolders]);
+            hasChanges = true;
           }
         }
+      }
+      
+      // 只有在修改主要文件夹时才清除历史记录ID
+      // 如果只是添加对比文件夹，不调用回调以保持历史记录跟踪
+      if (hasChanges && (currentOriginalFolder !== originalFolderRef.current || 
+                         currentGtFolder !== gtFolderRef.current || 
+                         currentMyFolder !== myFolderRef.current)) {
+        onMainFoldersChanged?.();
       }
     } catch (err) {
       setError('处理拖放文件时出错: ' + err);
     }
-  }, [gtFolder, myFolder, comparisonFolders]);
+  }, [onMainFoldersChanged]);
 
   // 监听全局拖放事件
   useEffect(() => {
@@ -123,14 +167,22 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
     };
   }, [loading, handleFolderDrop]);
 
+  const handleOriginalFolderChange = (path: string) => {
+    setOriginalFolder(path);
+    setError(null);
+    onMainFoldersChanged?.(); // 修改主要文件夹，清除历史记录ID
+  };
+
   const handleGtFolderChange = (path: string) => {
     setGtFolder(path);
     setError(null);
+    onMainFoldersChanged?.(); // 修改主要文件夹，清除历史记录ID
   };
 
   const handleMyFolderChange = (path: string) => {
     setMyFolder(path);
     setError(null);
+    onMainFoldersChanged?.(); // 修改主要文件夹，清除历史记录ID
   };
 
   const handleComparisonFolderAdd = (path: string) => {
@@ -144,12 +196,14 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
         };
         setComparisonFolders([...comparisonFolders, newFolder]);
         setError(null);
+        // 添加对比文件夹不清除历史记录ID，保持更新原记录
       }
     }
   };
 
   const removeComparisonFolder = (id: string) => {
     setComparisonFolders(comparisonFolders.filter(f => f.id !== id));
+    // 删除对比文件夹不清除历史记录ID，保持更新原记录
   };
 
   const startEditing = (folder: ComparisonFolder) => {
@@ -175,19 +229,20 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
   };
 
   const handleSubmit = () => {
-    if (!gtFolder || !myFolder || comparisonFolders.length === 0) {
-      setError('请至少选择GT文件夹、实验数据文件夹和一个对比文件夹');
+    if (!originalFolder || !gtFolder || !myFolder || comparisonFolders.length === 0) {
+      setError('请选择原始图片文件夹、GT文件夹、实验数据文件夹和至少一个对比文件夹');
       return;
     }
     
     onFoldersSelected({
+      original: originalFolder,
       gt: gtFolder,
       my: myFolder,
       comparison: comparisonFolders
     });
   };
 
-  const canSubmit = gtFolder && myFolder && comparisonFolders.length > 0;
+  const canSubmit = originalFolder && gtFolder && myFolder && comparisonFolders.length > 0;
 
   return (
     <div style={{ 
@@ -214,9 +269,10 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
             松开以按顺序添加文件夹
           </div>
           <div style={{ marginTop: '4px', fontSize: '12px', color: '#666' }}>
-            {!gtFolder && '将填入GT文件夹'}
-            {gtFolder && !myFolder && '将填入我的实验数据'}
-            {gtFolder && myFolder && '将添加到对比数据'}
+            {!originalFolderRef.current && '将填入：原始图片文件夹（不会覆盖已有数据）'}
+            {originalFolderRef.current && !gtFolderRef.current && '将填入：GT文件夹（跳过已有的原始数据）'}
+            {originalFolderRef.current && gtFolderRef.current && !myFolderRef.current && '将填入：我的实验数据（跳过已有数据）'}
+            {originalFolderRef.current && gtFolderRef.current && myFolderRef.current && '将添加到：对比数据（不覆盖任何已有数据）'}
           </div>
         </div>
       )}
@@ -228,9 +284,10 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
           <div>
             <Text>您可以直接将文件夹拖放到本页面的任意位置，系统会按以下顺序自动填入：</Text>
             <ol style={{ marginTop: '8px', paddingLeft: '20px' }}>
-              <li>第1个文件夹 → GT文件夹</li>
-              <li>第2个文件夹 → 我的实验数据</li>
-              <li>第3个及以后 → 对比数据</li>
+              <li>第1个文件夹 → 原始图片文件夹</li>
+              <li>第2个文件夹 → GT文件夹</li>
+              <li>第3个文件夹 → 我的实验数据</li>
+              <li>第4个及以后 → 对比数据</li>
             </ol>
             <Text type="secondary">也可以点击下方各个区域手动选择文件夹</Text>
           </div>
@@ -241,8 +298,19 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
       />
 
       <Row gutter={[16, 16]}>
+        {/* 原始图片文件夹选择 */}
+        <Col xs={24} sm={12} md={12} lg={12} xl={6} xxl={6}>
+          <FolderDropzone
+            title="原始图片文件夹"
+            description="选择包含原始图片的文件夹"
+            value={originalFolder}
+            onChange={handleOriginalFolderChange}
+            disabled={loading}
+          />
+        </Col>
+
         {/* GT文件夹选择 */}
-        <Col xs={24} md={12} lg={8}>
+        <Col xs={24} sm={12} md={12} lg={12} xl={6} xxl={6}>
           <FolderDropzone
             title="GT图片文件夹"
             description="选择包含真实标注（Ground Truth）的文件夹"
@@ -253,7 +321,7 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
         </Col>
 
         {/* 我的实验数据文件夹选择 */}
-        <Col xs={24} md={12} lg={8}>
+        <Col xs={24} sm={12} md={12} lg={12} xl={6} xxl={6}>
           <FolderDropzone
             title="我的实验数据"
             description="选择包含您的模型输出结果的文件夹"
@@ -264,7 +332,7 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
         </Col>
 
         {/* 对比数据文件夹选择 */}
-        <Col xs={24} md={12} lg={8}>
+        <Col xs={24} sm={12} md={12} lg={12} xl={6} xxl={6}>
           <FolderDropzone
             title="添加对比数据"
             description="选择要对比的其他模型输出结果文件夹"

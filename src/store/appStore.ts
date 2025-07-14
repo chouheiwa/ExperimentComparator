@@ -28,6 +28,8 @@ interface AppStore extends AppState {
   setHistoryRecords: (records: HistoryRecord[]) => void;
   addHistoryRecord: (folders: FolderData, name?: string, description?: string) => HistoryRecord | null;
   deleteHistoryRecord: (id: string) => void;
+  updateHistoryRecord: (id: string, name: string, description?: string) => void;
+  setCurrentHistoryRecordId: (id: string | null) => void;
   loadHistoryRecord: (record: HistoryRecord) => void;
   resetState: () => void;
   initialize: () => void;
@@ -36,6 +38,7 @@ interface AppStore extends AppState {
 const initialState: AppState = {
   currentStep: 'folder-selection',
   folders: {
+    original: '',
     gt: '',
     my: '',
     comparison: []
@@ -44,7 +47,8 @@ const initialState: AppState = {
   comparisonResults: [],
   loading: false,
   error: null,
-  historyRecords: []
+  historyRecords: [],
+  currentHistoryRecordId: null
 };
 
 export const useAppStore = create<AppStore>()(
@@ -97,6 +101,29 @@ export const useAppStore = create<AppStore>()(
       
       addHistoryRecord: (folders: FolderData, name?: string, description?: string) => {
         const currentRecords = get().historyRecords;
+        const currentHistoryRecordId = get().currentHistoryRecordId;
+        
+        // 如果当前有加载的历史记录ID，更新该记录而不是新增
+        if (currentHistoryRecordId) {
+          const recordIndex = currentRecords.findIndex(record => record.id === currentHistoryRecordId);
+          console.log('recordIndex', recordIndex);
+          if (recordIndex !== -1) {
+            const updatedRecord = {
+              ...currentRecords[recordIndex],
+              folders,
+              name: name || currentRecords[recordIndex].name,
+              description: description !== undefined ? description : currentRecords[recordIndex].description
+            };
+            
+            set((state) => {
+              state.historyRecords[recordIndex] = updatedRecord;
+            });
+            
+            const newRecords = get().historyRecords;
+            saveHistoryToStorage(newRecords);
+            return updatedRecord;
+          }
+        }
         
         // 检查是否已存在相同的配置
         if (isDuplicateFolders(folders, currentRecords)) {
@@ -106,6 +133,8 @@ export const useAppStore = create<AppStore>()(
         const newRecord = createHistoryRecord(folders, name, description);
         set((state) => {
           state.historyRecords.unshift(newRecord);
+          // 设置新记录为当前记录
+          state.currentHistoryRecordId = newRecord.id;
         });
         
         const newRecords = get().historyRecords;
@@ -120,6 +149,27 @@ export const useAppStore = create<AppStore>()(
         
         const newRecords = get().historyRecords;
         saveHistoryToStorage(newRecords);
+      },
+      
+      updateHistoryRecord: (id: string, name: string, description?: string) => {
+        set((state) => {
+          const recordIndex = state.historyRecords.findIndex(record => record.id === id);
+          if (recordIndex !== -1) {
+            state.historyRecords[recordIndex].name = name;
+            if (description !== undefined) {
+              state.historyRecords[recordIndex].description = description;
+            }
+          }
+        });
+        
+        const newRecords = get().historyRecords;
+        saveHistoryToStorage(newRecords);
+      },
+      
+      setCurrentHistoryRecordId: (id: string | null) => {
+        set((state) => {
+          state.currentHistoryRecordId = id;
+        });
       },
       
       loadHistoryRecord: (record: HistoryRecord) => {
@@ -137,9 +187,19 @@ export const useAppStore = create<AppStore>()(
             };
           }
           
+          // 处理向后兼容性：为旧记录添加默认的original字段
+          if (!folders.original) {
+            folders = {
+              ...folders,
+              original: ''
+            };
+          }
+          
           state.folders = folders;
           state.error = null;
           state.currentStep = 'folder-selection';
+          // 设置当前加载的历史记录ID
+          state.currentHistoryRecordId = record.id;
         });
       },
       
@@ -147,6 +207,7 @@ export const useAppStore = create<AppStore>()(
         set((state) => {
           state.currentStep = 'folder-selection';
           state.folders = {
+            original: '',
             gt: '',
             my: '',
             comparison: []
@@ -155,6 +216,7 @@ export const useAppStore = create<AppStore>()(
           state.comparisonResults = [];
           state.loading = false;
           state.error = null;
+          state.currentHistoryRecordId = null;
         });
       },
       
@@ -187,6 +249,8 @@ export const useSetError = () => useAppStore((state) => state.setError);
 export const useSetHistoryRecords = () => useAppStore((state) => state.setHistoryRecords);
 export const useAddHistoryRecord = () => useAppStore((state) => state.addHistoryRecord);
 export const useDeleteHistoryRecord = () => useAppStore((state) => state.deleteHistoryRecord);
+export const useUpdateHistoryRecord = () => useAppStore((state) => state.updateHistoryRecord);
+export const useSetCurrentHistoryRecordId = () => useAppStore((state) => state.setCurrentHistoryRecordId);
 export const useLoadHistoryRecord = () => useAppStore((state) => state.loadHistoryRecord);
 export const useResetState = () => useAppStore((state) => state.resetState);
 export const useInitialize = () => useAppStore((state) => state.initialize);

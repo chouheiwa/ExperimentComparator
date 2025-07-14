@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { 
   Card, 
   List, 
@@ -12,6 +12,8 @@ import {
   Tooltip,
   Empty
 } from 'antd';
+import { save, open } from '@tauri-apps/api/dialog';
+import { writeTextFile, readTextFile } from '@tauri-apps/api/fs';
 import { 
   HistoryOutlined, 
   DeleteOutlined, 
@@ -32,6 +34,7 @@ interface HistoryPanelProps {
   records: HistoryRecord[];
   onLoadRecord: (record: HistoryRecord) => void;
   onDeleteRecord: (id: string) => void;
+  onUpdateRecord: (id: string, name: string, description?: string) => void;
   onImportRecords: (records: HistoryRecord[]) => void;
   loading?: boolean;
 }
@@ -40,6 +43,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   records,
   onLoadRecord,
   onDeleteRecord,
+  onUpdateRecord,
   onImportRecords,
   loading = false
 }) => {
@@ -47,49 +51,59 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   const [editingRecord, setEditingRecord] = useState<HistoryRecord | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     try {
       const jsonString = exportHistoryToJson(records);
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `datachoosing-history-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      message.success('历史记录导出成功！');
+      const defaultFileName = `datachoosing-history-${new Date().toISOString().split('T')[0]}.json`;
+      
+      // 弹出文件保存对话框让用户选择保存位置
+      const filePath = await save({
+        title: '导出历史记录',
+        defaultPath: defaultFileName,
+        filters: [{
+          name: 'JSON 文件',
+          extensions: ['json']
+        }]
+      });
+      
+      // 用户取消了对话框
+      if (!filePath) {
+        return;
+      }
+      
+      // 写入文件
+      await writeTextFile(filePath, jsonString);
+      message.success(`历史记录导出成功！保存至：${filePath}`);
     } catch (error) {
       message.error('导出失败：' + error);
     }
   };
 
-  const handleImport = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        const importedRecords = importHistoryFromJson(content);
-        onImportRecords(importedRecords);
-        message.success(`成功导入 ${importedRecords.length} 条历史记录！`);
-      } catch (error) {
-        message.error('导入失败：' + error);
+  const handleImport = async () => {
+    try {
+      // 弹出文件选择对话框
+      const filePath = await open({
+        title: '导入历史记录',
+        filters: [{
+          name: 'JSON 文件',
+          extensions: ['json']
+        }]
+      });
+      
+      // 用户取消了对话框
+      if (!filePath || Array.isArray(filePath)) {
+        return;
       }
-    };
-    reader.readAsText(file);
-    
-    // 清空input值，允许重复选择同一文件
-    event.target.value = '';
+      
+      // 读取文件内容
+      const content = await readTextFile(filePath);
+      const importedRecords = importHistoryFromJson(content);
+      onImportRecords(importedRecords);
+      message.success(`成功导入 ${importedRecords.length} 条历史记录！`);
+    } catch (error) {
+      message.error('导入失败：' + error);
+    }
   };
 
   const handleEdit = (record: HistoryRecord) => {
@@ -100,12 +114,15 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   };
 
   const handleEditSave = () => {
-    if (!editingRecord) return;
+    if (!editingRecord || !editName.trim()) return;
     
-    // 这里应该调用更新记录的函数
-    // 暂时先关闭模态框
+    // 调用更新记录的函数
+    onUpdateRecord(editingRecord.id, editName.trim(), editDescription);
+    
     setEditModalVisible(false);
     setEditingRecord(null);
+    setEditName('');
+    setEditDescription('');
     message.success('记录更新成功！');
   };
 
@@ -128,15 +145,15 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
         </Space>
       }
       extra={
-        <Space>
+        <Space size={4}>
           <Tooltip title="导入历史记录">
             <Button 
               icon={<UploadOutlined />} 
               onClick={handleImport}
               size="small"
-            >
-              导入
-            </Button>
+              type="text"
+              style={{ padding: '2px 6px', minWidth: 'auto' }}
+            />
           </Tooltip>
           <Tooltip title="导出历史记录">
             <Button 
@@ -144,9 +161,9 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
               onClick={handleExport}
               disabled={records.length === 0}
               size="small"
-            >
-              导出
-            </Button>
+              type="text"
+              style={{ padding: '2px 6px', minWidth: 'auto' }}
+            />
           </Tooltip>
         </Space>
       }
@@ -162,39 +179,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
           dataSource={records}
           renderItem={(record) => (
             <List.Item
-              actions={[
-                <Tooltip title="加载配置">
-                  <Button
-                    type="text"
-                    icon={<PlayCircleOutlined />}
-                    onClick={() => onLoadRecord(record)}
-                    disabled={loading}
-                  />
-                </Tooltip>,
-                <Tooltip title="编辑">
-                  <Button
-                    type="text"
-                    icon={<EditOutlined />}
-                    onClick={() => handleEdit(record)}
-                  />
-                </Tooltip>,
-                <Popconfirm
-                  title="确认删除"
-                  description="确定要删除这条历史记录吗？"
-                  onConfirm={() => onDeleteRecord(record.id)}
-                  okText="删除"
-                  cancelText="取消"
-                  okType="danger"
-                >
-                  <Tooltip title="删除">
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
-                    />
-                  </Tooltip>
-                </Popconfirm>
-              ]}
+              style={{ position: 'relative', paddingBottom: '32px' }}
             >
               <List.Item.Meta
                 title={
@@ -217,6 +202,15 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
                       </Paragraph>
                     )}
                     <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                      {record.folders.original && (
+                        <Space size={4}>
+                          <Text style={{ fontSize: '12px' }}>原始:</Text>
+                          <Text code style={{ fontSize: '11px' }}>
+                            <FolderOutlined style={{ marginRight: '2px' }} />
+                            {formatPath(record.folders.original)}
+                          </Text>
+                        </Space>
+                      )}
                       <Space size={4}>
                         <Text style={{ fontSize: '12px' }}>GT:</Text>
                         <Text code style={{ fontSize: '11px' }}>
@@ -241,19 +235,80 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
                   </div>
                 }
               />
+              
+              {/* 右下角操作按钮 */}
+              <div style={{
+                position: 'absolute',
+                bottom: '8px',
+                right: '8px',
+                display: 'flex',
+                gap: '4px'
+              }}>
+                <Tooltip title="加载配置">
+                  <Button
+                    type="text"
+                    icon={<PlayCircleOutlined />}
+                    onClick={() => onLoadRecord(record)}
+                    disabled={loading}
+                    size="small"
+                    style={{ 
+                      padding: '2px 4px', 
+                      minWidth: 'auto',
+                      opacity: 0.6,
+                      transition: 'opacity 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+                  />
+                </Tooltip>
+                <Tooltip title="编辑">
+                  <Button
+                    type="text"
+                    icon={<EditOutlined />}
+                    onClick={() => handleEdit(record)}
+                    size="small"
+                    style={{ 
+                      padding: '2px 4px', 
+                      minWidth: 'auto',
+                      opacity: 0.6,
+                      transition: 'opacity 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+                  />
+                </Tooltip>
+                <Popconfirm
+                  title="确认删除"
+                  description="确定要删除这条历史记录吗？"
+                  onConfirm={() => onDeleteRecord(record.id)}
+                  okText="删除"
+                  cancelText="取消"
+                  okType="danger"
+                >
+                  <Tooltip title="删除">
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      size="small"
+                      style={{ 
+                        padding: '2px 4px', 
+                        minWidth: 'auto',
+                        opacity: 0.6,
+                        transition: 'opacity 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                      onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+                    />
+                  </Tooltip>
+                </Popconfirm>
+              </div>
             </List.Item>
           )}
         />
       )}
 
-      {/* 隐藏的文件输入 */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json"
-        style={{ display: 'none' }}
-        onChange={handleFileChange}
-      />
+
 
       {/* 编辑模态框 */}
       <Modal

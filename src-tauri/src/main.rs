@@ -211,6 +211,7 @@ struct ComparisonFolderData {
 
 #[tauri::command]
 async fn calculate_comparisons(
+    original_folder: String,
     gt_folder: String,
     my_folder: String,
     comparison_folders: Vec<ComparisonFolderData>,
@@ -219,6 +220,7 @@ async fn calculate_comparisons(
     let mut results = Vec::new();
     
     for filename in common_files {
+        let original_path = format!("{}/{}", original_folder, filename);
         let gt_path = format!("{}/{}", gt_folder, filename);
         let my_path = format!("{}/{}", my_folder, filename);
         
@@ -226,7 +228,8 @@ async fn calculate_comparisons(
         let mut accuracy_scores = HashMap::new();
         let mut paths = HashMap::new();
         
-        // 添加GT和我的实验数据路径
+        // 添加原始图片、GT和我的实验数据路径
+        paths.insert("原始图片".to_string(), original_path.clone());
         paths.insert("GT".to_string(), gt_path.clone());
         paths.insert("我的结果".to_string(), my_path.clone());
         

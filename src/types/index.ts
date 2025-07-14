@@ -18,6 +18,7 @@ export interface ComparisonFolder {
 }
 
 export interface FolderData {
+  original: string;
   gt: string;
   my: string;
   comparison: ComparisonFolder[];
@@ -41,4 +42,5 @@ export interface AppState {
   loading: boolean;
   error: string | null;
   historyRecords: HistoryRecord[];
+  currentHistoryRecordId: string | null; // 当前加载的历史记录ID
 } 

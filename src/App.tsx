@@ -20,6 +20,8 @@ import {
   useSetHistoryRecords,
   useAddHistoryRecord,
   useDeleteHistoryRecord,
+  useUpdateHistoryRecord,
+  useSetCurrentHistoryRecordId,
   useLoadHistoryRecord,
   useResetState
 } from './store/appStore';
@@ -60,6 +62,8 @@ const App: React.FC = () => {
   const setHistoryRecords = useSetHistoryRecords();
   const addHistoryRecord = useAddHistoryRecord();
   const deleteHistoryRecord = useDeleteHistoryRecord();
+  const updateHistoryRecord = useUpdateHistoryRecord();
+  const setCurrentHistoryRecordId = useSetCurrentHistoryRecordId();
   const loadHistoryRecord = useLoadHistoryRecord();
   const resetState = useResetState();
 
@@ -70,7 +74,7 @@ const App: React.FC = () => {
     
     try {
       const comparisonPaths = selectedFolders.comparison.map(f => f.path);
-      const allFolders = [selectedFolders.gt, selectedFolders.my, ...comparisonPaths];
+      const allFolders = [selectedFolders.original, selectedFolders.gt, selectedFolders.my, ...comparisonPaths];
       const result = await invoke<ValidationResult>('validate_folders', { folders: allFolders });
       setValidationResult(result);
       setCurrentStep('validation');
@@ -94,6 +98,7 @@ const App: React.FC = () => {
       }));
       
       const results = await invoke<ComparisonResult[]>('calculate_comparisons', {
+        originalFolder: folders.original,
         gtFolder: folders.gt,
         myFolder: folders.my,
         comparisonFolders: comparisonData,
@@ -162,7 +167,7 @@ const App: React.FC = () => {
         </div>
       </Header>
       
-      <Content style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+      <Content style={{ padding: '24px', maxWidth: '1600px', margin: '0 auto', width: '100%' }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <Paragraph style={{ fontSize: '16px', color: '#666' }}>
             模型实验结果对比分析工具
@@ -208,18 +213,20 @@ const App: React.FC = () => {
 
             {currentStep === 'folder-selection' && (
               <Row gutter={[24, 24]}>
-                <Col xs={24} lg={16}>
+                <Col xs={24} md={24} lg={16} xl={18}>
                   <FolderSelection
                     onFoldersSelected={handleFoldersSelected}
                     loading={loading}
                     folders={folders}
+                    onMainFoldersChanged={() => setCurrentHistoryRecordId(null)}
                   />
                 </Col>
-                <Col xs={24} lg={8}>
+                <Col xs={24} md={24} lg={8} xl={6}>
                   <HistoryPanel
                     records={historyRecords}
                     onLoadRecord={loadHistoryRecord}
                     onDeleteRecord={deleteHistoryRecord}
+                    onUpdateRecord={updateHistoryRecord}
                     onImportRecords={(records) => {
                       setHistoryRecords([...records, ...historyRecords]);
                     }}

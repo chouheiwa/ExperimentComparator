@@ -3,6 +3,7 @@ import { Card, Button, Select, Switch, Row, Col, Typography, Statistic, Tag, Spa
 import { EyeOutlined, DownloadOutlined, StarOutlined, StarFilled } from '@ant-design/icons';
 import { ComparisonResult } from '../types';
 import { formatIou, getIouStatus } from '../utils';
+import ImageComparisonGrid, { getSortedEntries } from './ImageComparisonGrid';
 import SafeImage from './SafeImage';
 
 const { Text } = Typography;
@@ -192,19 +193,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
     message.success(`成功导出 ${selectedImages.size} 个图像的分析数据`);
   };
 
-  // 获取排序后的图片条目
-  const getSortedEntries = (paths: Record<string, string>) => {
-    const entries = Object.entries(paths);
-    const order = ['GT', '我的结果'];
-    const comparisonKeys = entries
-      .filter(([name]) => !order.includes(name))
-      .map(([name]) => name)
-      .sort();
-    const fullOrder = [...order, ...comparisonKeys];
-    return fullOrder
-      .filter(name => paths[name] !== undefined)
-      .map(name => [name, paths[name]] as [string, string]);
-  };
+
 
   // 获取类别标签
   const getCategoryTag = (category: CaseAnalysis['category']) => {
@@ -324,7 +313,6 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
       <Row gutter={[16, 16]}>
         {displayResults.map((result) => {
           const analysis = analysisData.find(a => a.filename === result.filename)!;
-          const sortedEntries = getSortedEntries(result.paths);
           
           return (
             <Col key={result.filename} xs={24} lg={isGridView ? 8 : 24}>
@@ -364,116 +352,15 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
                   border: selectedImages.has(result.filename) ? '2px solid #1890ff' : undefined
                 }}
               >
-                {/* 性能指标摘要 */}
-                <Row gutter={[8, 8]} style={{ marginBottom: '16px' }}>
-                  <Col span={4}>
-                    <Statistic
-                      title="平均IOU"
-                      value={analysis.avgIou * 100}
-                      precision={1}
-                      suffix="%"
-                      valueStyle={{ fontSize: '14px' }}
-                    />
-                  </Col>
-                  <Col span={4}>
-                    <Statistic
-                      title="我的IOU"
-                      value={analysis.myIou * 100}
-                      precision={1}
-                      suffix="%"
-                      valueStyle={{ 
-                        fontSize: '14px',
-                        color: analysis.myAdvantage > 0 ? '#52c41a' : '#ff4d4f'
-                      }}
-                    />
-                  </Col>
-                  <Col span={4}>
-                    <Statistic
-                      title="其他平均"
-                      value={analysis.othersAvgIou * 100}
-                      precision={1}
-                      suffix="%"
-                      valueStyle={{ fontSize: '14px' }}
-                    />
-                  </Col>
-                  <Col span={4}>
-                    <Statistic
-                      title="我的优势"
-                      value={analysis.myAdvantage * 100}
-                      precision={1}
-                      suffix="%"
-                      valueStyle={{ 
-                        fontSize: '14px',
-                        color: analysis.myAdvantage > 0.2 ? '#52c41a' : 
-                               analysis.myAdvantage > 0 ? '#faad14' : '#ff4d4f'
-                      }}
-                    />
-                  </Col>
-                  <Col span={4}>
-                    <Statistic
-                      title="IOU方差"
-                      value={analysis.iouVariance}
-                      precision={3}
-                      valueStyle={{ fontSize: '14px' }}
-                    />
-                  </Col>
-                  <Col span={4}>
-                    <Statistic
-                      title="平均准确率"
-                      value={analysis.avgAccuracy * 100}
-                      precision={1}
-                      suffix="%"
-                      valueStyle={{ fontSize: '14px' }}
-                    />
-                  </Col>
-                </Row>
-                
-                {/* 图像展示 */}
-                <Row gutter={[8, 8]}>
-                  {sortedEntries.map(([name, path]) => (
-                    <Col key={name} span={isGridView ? 24 : 8}>
-                      <Card 
-                        size="small" 
-                        title={
-                          <Space>
-                            <Text strong style={{ fontSize: '12px' }}>{name}</Text>
-                            {result.iou_scores[name] !== undefined && (
-                              <Tag color={
-                                getIouStatus(result.iou_scores[name]) === 'success' ? 'green' : 
-                                getIouStatus(result.iou_scores[name]) === 'warning' ? 'orange' : 'red'
-                              }>
-                                {formatIou(result.iou_scores[name])}
-                              </Tag>
-                            )}
-                          </Space>
-                        }
-                        extra={
-                          <Button
-                            type="text"
-                            icon={<EyeOutlined />}
-                            size="small"
-                            onClick={() => setPreviewImage({result, methodName: name})}
-                          />
-                        }
-                        style={{ textAlign: 'center' }}
-                      >
-                        <div 
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => setPreviewImage({result, methodName: name})}
-                        >
-                          <SafeImage
-                            src={path}
-                            alt={`${name} - ${result.filename}`}
-                            style={{ 
-                              maxWidth: '100%', 
-                              maxHeight: isGridView ? '100px' : '150px'
-                            }}
-                          />
-                        </div>
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
+                {/* 图像展示及统计信息 */}
+                <ImageComparisonGrid
+                  result={result}
+                  isGridView={isGridView}
+                  onPreviewImage={(result, methodName) => setPreviewImage({result, methodName})}
+                  showPreviewButton={true}
+                  showStatistics={true}
+                  statisticsPosition="top"
+                />
               </Card>
             </Col>
           );
@@ -494,7 +381,11 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
             <SafeImage
               src={previewImage.result.paths[previewImage.methodName]}
               alt={`${previewImage.methodName} - ${previewImage.result.filename}`}
-              style={{ maxWidth: '100%', maxHeight: '70vh' }}
+              style={{ 
+                maxWidth: '100%', 
+                maxHeight: '70vh',
+                objectFit: 'contain'
+              }}
             />
           </div>
         )}
