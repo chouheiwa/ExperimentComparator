@@ -13,7 +13,6 @@ export interface ImageComparisonGridProps {
   onPreviewImage?: (result: ComparisonResult, methodName: string) => void;
   showPreviewButton?: boolean;
   imageHeight?: number;
-  colSpan?: number;
   showStatistics?: boolean; // 是否显示统计信息
   statisticsPosition?: 'top' | 'bottom'; // 统计信息位置
 }
@@ -38,7 +37,6 @@ const ImageComparisonGrid: React.FC<ImageComparisonGridProps> = ({
   onPreviewImage,
   showPreviewButton = true,
   imageHeight,
-  colSpan,
   showStatistics = false,
   statisticsPosition = 'top'
 }) => {
@@ -46,7 +44,6 @@ const ImageComparisonGrid: React.FC<ImageComparisonGridProps> = ({
   
   // 计算默认值
   const defaultImageHeight = imageHeight || (isGridView ? 100 : 150);
-  const defaultColSpan = colSpan || (isGridView ? 24 : 8);
 
   // 计算统计信息
   const statisticsData = useMemo(() => {

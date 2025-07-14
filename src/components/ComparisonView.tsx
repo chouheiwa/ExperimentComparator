@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, Button, Typography, Space, Progress, Row, Col, Statistic } from 'antd';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, Button, Typography, Space, Row, Col, Statistic } from 'antd';
 import { LeftOutlined, RightOutlined, ReloadOutlined, BarChartOutlined } from '@ant-design/icons';
 import { ComparisonResult } from '../types';
-import { formatIou, getIouStatus } from '../utils';
+import { getIouStatus } from '../utils';
 import ImageComparisonGrid, { getSortedEntries } from './ImageComparisonGrid';
 
 const { Title, Text } = Typography;
@@ -108,7 +108,6 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ results, onReset }) => 
           isGridView={false}
           showPreviewButton={false}
           imageHeight={200}
-          colSpan={8}
           showStatistics={true}
           statisticsPosition="top"
         />

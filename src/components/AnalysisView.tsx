@@ -1,9 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Button, Select, Switch, Row, Col, Typography, Statistic, Tag, Space, Modal, message } from 'antd';
-import { EyeOutlined, DownloadOutlined, StarOutlined, StarFilled } from '@ant-design/icons';
+import { Card, Button, Select, Switch, Row, Col, Typography, Tag, Space, Modal, message } from 'antd';
+import { DownloadOutlined, StarOutlined, StarFilled } from '@ant-design/icons';
 import { ComparisonResult } from '../types';
-import { formatIou, getIouStatus } from '../utils';
-import ImageComparisonGrid, { getSortedEntries } from './ImageComparisonGrid';
+import ImageComparisonGrid from './ImageComparisonGrid';
 import SafeImage from './SafeImage';
 
 const { Text } = Typography;
