@@ -2,13 +2,37 @@ name: Build
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.1)'
+        required: true
+        type: string
+      create_release:
+        description: 'Create GitHub Release'
+        required: true
+        type: boolean
+        default: false
+      release_title:
+        description: 'Release title (if empty, will use default)'
+        required: false
+        type: string
+      release_body:
+        description: 'Release description (supports Markdown)'
+        required: false
+        type: string
 
 jobs:
   build:
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, windows-latest]
+        include:
+          - platform: 'macos-latest'
+            args: '--target universal-apple-darwin'
+          - platform: 'windows-latest'
+            args: '--target x86_64-pc-windows-msvc'
 
     runs-on: ${{ matrix.platform }}
     
@@ -18,6 +42,8 @@ jobs:
 
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -33,16 +59,70 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build the app
-        run: npm run tauri build
+      - name: Set default release title
+        if: ${{ github.event.inputs.create_release == 'true' }}
+        shell: bash
+        run: |
+          if [ -z "${{ github.event.inputs.release_title }}" ]; then
+            echo "RELEASE_TITLE=DataChoosing ${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          else
+            echo "RELEASE_TITLE=${{ github.event.inputs.release_title }}" >> $GITHUB_ENV
+          fi
 
-      - name: Upload artifacts
+      - name: Set default release body
+        if: ${{ github.event.inputs.create_release == 'true' }}
+        shell: bash
+        run: |
+          if [ -z "${{ github.event.inputs.release_body }}" ]; then
+            cat << 'EOF' >> $GITHUB_ENV
+          RELEASE_BODY=## 🎉 数据选择对比工具 ${{ github.event.inputs.version }}
+
+          ### 📥 下载安装
+          - **Windows**: 下载 `.exe` 或 `.msi` 文件直接安装
+          - **macOS**: 下载 `.dmg` 文件，拖拽到应用程序文件夹
+
+          ### ✨ 新功能与改进
+          - 优化图片对比界面，支持更紧密的布局
+          - 完善历史记录管理，支持智能更新
+          - 改进文件拖放体验，防止覆盖已有数据
+          - 统一统计信息显示组件
+          - 使用原生文件对话框进行导入导出
+
+          ### 🔧 使用说明
+          1. 选择原始图片、GT图片、实验数据和对比数据文件夹
+          2. 系统自动验证文件一致性
+          3. 查看详细的IOU和准确率对比结果
+          4. 支持历史记录保存和导入导出
+          EOF
+          else
+            echo "RELEASE_BODY=${{ github.event.inputs.release_body }}" >> $GITHUB_ENV
+          fi
+
+      - name: Build the app (with release creation)
+        if: ${{ github.event.inputs.create_release == 'true' }}
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.event.inputs.version }}
+          releaseName: ${{ env.RELEASE_TITLE }}
+          releaseBody: ${{ env.RELEASE_BODY }}
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
+
+      - name: Build the app (artifacts only)
+        if: ${{ github.event.inputs.create_release != 'true' }}
+        run: npm run tauri build -- ${{ matrix.args }}
+
+      - name: Upload artifacts (when not creating release)
+        if: ${{ github.event.inputs.create_release != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}-artifacts
           path: |
-            src-tauri/target/release/bundle/
-            src-tauri/target/release/*.exe
-            src-tauri/target/release/*.dmg
-            src-tauri/target/release/*.AppImage
-            src-tauri/target/release/*.deb 
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.deb 
