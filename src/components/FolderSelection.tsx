@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Card, Button, Space, Tag, Alert, Row, Col, Typography, Input } from 'antd';
+import { Card, Button, Space, Tag, Alert, Row, Col, Typography, Input, Modal } from 'antd';
 import { DeleteOutlined, PlusOutlined, InboxOutlined, EditOutlined } from '@ant-design/icons';
 import { listen } from '@tauri-apps/api/event';
 import { dirname } from '@tauri-apps/api/path';
@@ -35,6 +35,10 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
   const [isDragging, setIsDragging] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  // 模态框相关状态
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [modalInputValue, setModalInputValue] = useState('');
+  const [pendingFolderPath, setPendingFolderPath] = useState<string | null>(null);
 
   // 使用ref来确保拖放处理函数中能获取到最新的状态值
   const originalFolderRef = useRef(originalFolder);
@@ -107,14 +111,13 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
           // 所有必要字段都有值时，只添加到对比数据（避免重复）
           const existingPaths = currentComparisonFolders.map(f => f.path);
           if (!existingPaths.includes(finalPath)) {
-            const newFolder: ComparisonFolder = {
-              id: generateId(),
-              name: generateDefaultName(currentComparisonFolders.length),
-              path: finalPath
-            };
-            currentComparisonFolders.push(newFolder);
-            setComparisonFolders([...currentComparisonFolders]);
+            // 对于拖拽情况，找到第一个需要添加的文件夹就弹出模态框
+            // 中断循环，一次只处理一个对比文件夹
+            setPendingFolderPath(finalPath);
+            setModalInputValue(generateDefaultName(currentComparisonFolders.length));
+            setIsModalVisible(true);
             hasChanges = true;
+            return; // 中断处理，等待用户输入
           }
         }
       }
@@ -189,14 +192,10 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
     if (path) {
       const existingPaths = comparisonFolders.map(f => f.path);
       if (!existingPaths.includes(path)) {
-        const newFolder: ComparisonFolder = {
-          id: generateId(),
-          name: generateDefaultName(comparisonFolders.length),
-          path: path
-        };
-        setComparisonFolders([...comparisonFolders, newFolder]);
-        setError(null);
-        // 添加对比文件夹不清除历史记录ID，保持更新原记录
+        // 弹出模态框让用户输入自定义名称
+        setPendingFolderPath(path);
+        setModalInputValue(generateDefaultName(comparisonFolders.length));
+        setIsModalVisible(true);
       }
     }
   };
@@ -226,6 +225,31 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
   const cancelEditing = () => {
     setEditingId(null);
     setEditingName('');
+  };
+
+  // 模态框确认处理
+  const handleModalOk = () => {
+    if (pendingFolderPath && modalInputValue.trim()) {
+      const newFolder: ComparisonFolder = {
+        id: generateId(),
+        name: modalInputValue.trim(),
+        path: pendingFolderPath
+      };
+      setComparisonFolders([...comparisonFolders, newFolder]);
+      setError(null);
+      
+      // 重置模态框状态
+      setIsModalVisible(false);
+      setModalInputValue('');
+      setPendingFolderPath(null);
+    }
+  };
+
+  // 模态框取消处理
+  const handleModalCancel = () => {
+    setIsModalVisible(false);
+    setModalInputValue('');
+    setPendingFolderPath(null);
   };
 
   const handleSubmit = () => {
@@ -443,6 +467,28 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
           {loading ? '验证中...' : '开始验证'}
         </Button>
       </div>
+
+      {/* 模型名称输入模态框 */}
+      <Modal
+        title="设置模型名称"
+        open={isModalVisible}
+        onOk={handleModalOk}
+        onCancel={handleModalCancel}
+        okText="确认"
+        cancelText="取消"
+        centered
+      >
+        <div style={{ marginBottom: '16px' }}>
+          <Text type="secondary">请为这个对比文件夹设置一个名称：</Text>
+        </div>
+        <Input
+          value={modalInputValue}
+          onChange={(e) => setModalInputValue(e.target.value)}
+          placeholder="请输入模型名称"
+          onPressEnter={handleModalOk}
+          autoFocus
+        />
+      </Modal>
     </div>
   );
 };
