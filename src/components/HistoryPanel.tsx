@@ -11,7 +11,6 @@ import {
   message,
   Tooltip,
   Empty,
-  Divider,
   Statistic,
   Alert
 } from 'antd';
@@ -166,9 +165,17 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
     return new Date(dateString).toLocaleString('zh-CN');
   };
 
-  const formatPath = (path: string) => {
+  const formatPath = (path: string, maxLength = 50) => {
+    if (path.length <= maxLength) return path;
     const parts = path.split('/');
-    return parts[parts.length - 1] || path;
+    const fileName = parts[parts.length - 1];
+    if (fileName.length >= maxLength - 5) {
+      return `...${fileName.slice(-(maxLength - 5))}`;
+    }
+    // 显示开头和结尾
+    const start = path.slice(0, Math.floor((maxLength - 5) / 2));
+    const end = path.slice(-Math.floor((maxLength - 5) / 2));
+    return `${start}...${end}`;
   };
 
   return (
@@ -219,58 +226,71 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
             dataSource={records}
             renderItem={(record) => (
               <List.Item
-                style={{ position: 'relative', paddingBottom: '32px' }}
+                style={{ 
+                  position: 'relative', 
+                  paddingBottom: '40px',
+                  paddingTop: '16px',
+                  borderBottom: '1px solid #f0f0f0'
+                }}
               >
                 <List.Item.Meta
                   title={
-                    <Space>
-                      <Text strong>{record.name}</Text>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>
-                        <CalendarOutlined style={{ marginRight: '4px' }} />
-                        {formatDate(record.createdAt)}
-                      </Text>
-                    </Space>
+                    <div style={{ width: '100%' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                        <Text strong style={{ fontSize: '16px', maxWidth: '70%', wordBreak: 'break-word' }}>
+                          {record.name}
+                        </Text>
+                        <Text type="secondary" style={{ fontSize: '12px', whiteSpace: 'nowrap' }}>
+                          <CalendarOutlined style={{ marginRight: '4px' }} />
+                          {formatDate(record.createdAt)}
+                        </Text>
+                      </div>
+                      {/* 显示主要路径信息作为副标题 */}
+                      <div style={{ marginTop: '6px' }}>
+                        <Space direction="vertical" size={2}>
+                          <div>
+                            <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>GT标准:</Text>
+                            <Text code style={{ fontSize: '11px', marginLeft: '8px' }}>
+                              {formatPath(record.folders.gt, 80)}
+                            </Text>
+                          </div>
+                          <div>
+                            <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>我的结果:</Text>
+                            <Text code style={{ fontSize: '11px', marginLeft: '8px' }}>
+                              {formatPath(record.folders.my, 80)}
+                            </Text>
+                          </div>
+                        </Space>
+                      </div>
+                    </div>
                   }
                   description={
-                    <div>
+                    <div style={{ marginTop: '8px' }}>
                       {record.description && (
                         <Paragraph 
-                          style={{ margin: '4px 0', fontSize: '12px' }}
-                          type="secondary"
+                          style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#666' }}
                         >
                           {record.description}
                         </Paragraph>
                       )}
-                      <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                      <Space direction="vertical" size={4} style={{ width: '100%' }}>
                         {record.folders.original && (
-                          <Space size={4}>
-                            <Text style={{ fontSize: '12px' }}>原始:</Text>
-                            <Text code style={{ fontSize: '11px' }}>
-                              <FolderOutlined style={{ marginRight: '2px' }} />
-                              {formatPath(record.folders.original)}
+                          <div>
+                            <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>原始图片:</Text>
+                            <Text code style={{ fontSize: '11px', marginLeft: '8px' }}>
+                              {formatPath(record.folders.original, 80)}
                             </Text>
-                          </Space>
+                          </div>
                         )}
-                        <Space size={4}>
-                          <Text style={{ fontSize: '12px' }}>GT:</Text>
-                          <Text code style={{ fontSize: '11px' }}>
-                            <FolderOutlined style={{ marginRight: '2px' }} />
-                            {formatPath(record.folders.gt)}
+                        <div>
+                          <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>对比数据:</Text>
+                          <Text style={{ fontSize: '11px', marginLeft: '8px' }}>
+                            {record.folders.comparison.map(comp => comp.name).join(', ')} 
+                            <Text type="secondary" style={{ marginLeft: '4px' }}>
+                              ({record.folders.comparison.length} 个文件夹)
+                            </Text>
                           </Text>
-                        </Space>
-                        <Space size={4}>
-                          <Text style={{ fontSize: '12px' }}>我的:</Text>
-                          <Text code style={{ fontSize: '11px' }}>
-                            <FolderOutlined style={{ marginRight: '2px' }} />
-                            {formatPath(record.folders.my)}
-                          </Text>
-                        </Space>
-                        <Space size={4}>
-                          <Text style={{ fontSize: '12px' }}>对比:</Text>
-                          <Text style={{ fontSize: '11px' }}>
-                            {record.folders.comparison.map(comp => comp.name).join(', ')} ({record.folders.comparison.length} 个)
-                          </Text>
-                        </Space>
+                        </div>
                       </Space>
                     </div>
                   }

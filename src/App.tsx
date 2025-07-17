@@ -19,7 +19,6 @@ import {
   useSetComparisonResults,
   useSetLoading,
   useSetError,
-  useSetHistoryRecords,
   useAddHistoryRecord,
   useDeleteHistoryRecord,
   useUpdateHistoryRecord,
@@ -31,9 +30,8 @@ import {
   useClearCache,
   useCleanupCache,
   useRefreshCacheMetadata
-} from './store/appStore';
+} from './store';
 import { useInitializeApp } from './hooks/useInitializeApp';
-import { getStepTitle } from './utils';
 import FolderSelection from './components/FolderSelection';
 import ValidationResults from './components/ValidationResults';
 import ComparisonView from './components/ComparisonView';
@@ -41,7 +39,7 @@ import AnalysisView from './components/AnalysisView';
 import HistoryPanel from './components/HistoryPanel';
 
 const { Header, Content } = Layout;
-const { Title, Paragraph } = Typography;
+const { Title } = Typography;
 
 const App: React.FC = () => {
   // 初始化应用
@@ -68,7 +66,6 @@ const App: React.FC = () => {
   const setComparisonResults = useSetComparisonResults();
   const setLoading = useSetLoading();
   const setError = useSetError();
-  const setHistoryRecords = useSetHistoryRecords();
   const addHistoryRecord = useAddHistoryRecord();
   const deleteHistoryRecord = useDeleteHistoryRecord();
   const updateHistoryRecord = useUpdateHistoryRecord();
@@ -127,9 +124,9 @@ const App: React.FC = () => {
       
       // 只计算缺少缓存的对比
       if (missingComparisons.length > 0) {
-        console.log(`需要计算 ${missingComparisons.length} 个对比: ${missingComparisons.map(c => c.name).join(', ')}`);
+        console.log(`需要计算 ${missingComparisons.length} 个对比: ${missingComparisons.map((c: any) => c.name).join(', ')}`);
         
-        const comparisonData = missingComparisons.map(f => ({
+        const comparisonData = missingComparisons.map((f: any) => ({
           name: f.name,
           path: f.path
         }));

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useInitialize } from '../store/appStore';
+import { useInitialize } from '../store';
 
 export const useInitializeApp = () => {
   const initialize = useInitialize();

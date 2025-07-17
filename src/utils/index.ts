@@ -1,4 +1,4 @@
-import { Step, FolderData, CachedSingleComparison, ValidationResult, ComparisonResult, CacheMetadata, BaseFolderPaths, ComparisonFolder } from '../types';
+import { Step, FolderData, CachedSingleComparison, ComparisonResult, CacheMetadata, BaseFolderPaths } from '../types';
 
 export const getIouClass = (iou: number): string => {
   if (iou >= 0.7) return 'iou-high';
@@ -144,7 +144,6 @@ export const getAllCachedComparisons = (basePaths: BaseFolderPaths): CachedSingl
     if (!cacheData) return [];
     
     const cache: Record<string, CachedSingleComparison> = JSON.parse(cacheData);
-    const baseKey = generateBaseCacheKey(basePaths);
     
     return Object.values(cache).filter(item => 
       item.basePaths.original === basePaths.original &&
@@ -293,25 +292,4 @@ export const generateCacheKey = (folders: FolderData): string => {
   });
 };
 
-export const getCachedResult = (cacheKey: string): any => {
-  console.warn('getCachedResult is deprecated, use getCachedSingleComparison instead');
-  return null;
-};
-
-export const saveCacheResult = (result: any): void => {
-  console.warn('saveCacheResult is deprecated, use saveSingleComparisonCache instead');
-};
-
-export const createCacheResult = (folders: FolderData, validationResult: ValidationResult, comparisonResults: ComparisonResult[]): any => {
-  console.warn('createCacheResult is deprecated, use createSingleComparisonCache instead');
-  return null;
-};
-
-export const hasCachedResult = (folders: FolderData): boolean => {
-  console.warn('hasCachedResult is deprecated, use hasCachedComparison instead');
-  return false;
-};
-
-export const deleteCacheResult = (cacheKey: string): void => {
-  console.warn('deleteCacheResult is deprecated, use deleteSingleComparisonCache instead');
-}; 
+// 以下函数已废弃，已移除 
