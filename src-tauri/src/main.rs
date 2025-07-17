@@ -28,6 +28,14 @@ struct ValidationResult {
     missing_files: HashMap<String, Vec<String>>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct ProgressEvent {
+    current: usize,
+    total: usize,
+    percentage: f64,
+    current_file: String,
+}
+
 // 获取文件夹中的所有图片文件
 fn get_image_files(dir_path: &str) -> Result<Vec<String>, String> {
     let path = Path::new(dir_path);
@@ -210,6 +218,118 @@ struct ComparisonFolderData {
 }
 
 #[tauri::command]
+async fn calculate_comparisons_with_progress(
+    window: tauri::Window,
+    original_folder: String,
+    gt_folder: String,
+    my_folder: String,
+    comparison_folders: Vec<ComparisonFolderData>,
+    common_files: Vec<String>,
+) -> Result<Vec<ComparisonResult>, String> {
+    let mut results = Vec::new();
+    let total_files = common_files.len();
+    
+    for (index, filename) in common_files.iter().enumerate() {
+        // 发送进度事件
+        let progress = ProgressEvent {
+            current: index,
+            total: total_files,
+            percentage: (index as f64 / total_files as f64) * 100.0,
+            current_file: filename.clone(),
+        };
+        
+        if let Err(e) = window.emit("progress_update", &progress) {
+            eprintln!("发送进度事件失败: {}", e);
+        }
+        
+        let original_path = format!("{}/{}", original_folder, filename);
+        let gt_path = format!("{}/{}", gt_folder, filename);
+        let my_path = format!("{}/{}", my_folder, filename);
+        
+        let mut iou_scores = HashMap::new();
+        let mut accuracy_scores = HashMap::new();
+        let mut paths = HashMap::new();
+        
+        // 添加原始图片、GT和我的实验数据路径
+        paths.insert("原始图片".to_string(), original_path.clone());
+        paths.insert("GT".to_string(), gt_path.clone());
+        paths.insert("我的结果".to_string(), my_path.clone());
+        
+        // 计算我的结果与GT的IOU和准确率
+        match calculate_iou(&gt_path, &my_path) {
+            Ok(iou) => {
+                iou_scores.insert("我的结果".to_string(), iou);
+            }
+            Err(e) => {
+                eprintln!("计算IOU失败: {}", e);
+                iou_scores.insert("我的结果".to_string(), 0.0);
+            }
+        }
+        
+        match calculate_accuracy(&gt_path, &my_path) {
+            Ok(accuracy) => {
+                accuracy_scores.insert("我的结果".to_string(), accuracy);
+            }
+            Err(e) => {
+                eprintln!("计算准确率失败: {}", e);
+                accuracy_scores.insert("我的结果".to_string(), 0.0);
+            }
+        }
+        
+        // 计算对比数据与GT的IOU和准确率
+        for comp_folder in comparison_folders.iter() {
+            let comp_path = format!("{}/{}", comp_folder.path, filename);
+            let comp_name = comp_folder.name.clone();
+            
+            paths.insert(comp_name.clone(), comp_path.clone());
+            
+            // 计算IOU
+            match calculate_iou(&gt_path, &comp_path) {
+                Ok(iou) => {
+                    iou_scores.insert(comp_name.clone(), iou);
+                }
+                Err(e) => {
+                    eprintln!("计算IOU失败: {}", e);
+                    iou_scores.insert(comp_name.clone(), 0.0);
+                }
+            }
+            
+            // 计算准确率
+            match calculate_accuracy(&gt_path, &comp_path) {
+                Ok(accuracy) => {
+                    accuracy_scores.insert(comp_name.clone(), accuracy);
+                }
+                Err(e) => {
+                    eprintln!("计算准确率失败: {}", e);
+                    accuracy_scores.insert(comp_name.clone(), 0.0);
+                }
+            }
+        }
+        
+        results.push(ComparisonResult {
+            filename: filename.clone(),
+            iou_scores,
+            accuracy_scores,
+            paths,
+        });
+    }
+    
+    // 发送完成事件
+    let final_progress = ProgressEvent {
+        current: total_files,
+        total: total_files,
+        percentage: 100.0,
+        current_file: "计算完成".to_string(),
+    };
+    
+    if let Err(e) = window.emit("progress_update", &final_progress) {
+        eprintln!("发送完成事件失败: {}", e);
+    }
+    
+    Ok(results)
+}
+
+#[tauri::command]
 async fn calculate_comparisons(
     original_folder: String,
     gt_folder: String,
@@ -386,6 +506,7 @@ fn main() {
             get_folder_files,
             validate_folders,
             calculate_comparisons,
+            calculate_comparisons_with_progress,
             select_export_folder,
             export_selected_images
         ])

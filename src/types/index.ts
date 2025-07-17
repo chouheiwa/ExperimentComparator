@@ -24,6 +24,17 @@ export interface FolderData {
   comparison: ComparisonFolder[];
 }
 
+// 进度相关类型定义
+export interface ProgressInfo {
+  current: number;          // 当前已完成的数量
+  total: number;           // 总数量
+  percentage: number;      // 进度百分比
+  currentFileName?: string; // 当前正在处理的文件名
+  estimatedTimeRemaining?: number; // 预计剩余时间（秒）
+  startTime?: number;      // 开始时间（毫秒时间戳）
+  speed?: number;          // 处理速度（个/秒）
+}
+
 // 细粒度缓存相关类型定义
 export interface BaseFolderPaths {
   original: string;
@@ -73,4 +84,5 @@ export interface AppState {
   currentHistoryRecordId: string | null; // 当前加载的历史记录ID
   cacheMetadata: CacheMetadata | null; // 缓存元数据
   isUsingCache: boolean; // 当前结果是否来自缓存
+  progressInfo: ProgressInfo | null; // 进度信息
 } 

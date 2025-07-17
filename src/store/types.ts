@@ -7,7 +7,8 @@ import {
   HistoryRecord,
   CacheMetadata,
   BaseFolderPaths,
-  ComparisonFolder
+  ComparisonFolder,
+  ProgressInfo
 } from '../types';
 
 // Store接口定义
@@ -19,6 +20,12 @@ export interface FolderActions {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   resetState: () => void;
+}
+
+export interface ProgressActions {
+  setProgressInfo: (progress: ProgressInfo | null) => void;
+  updateProgress: (current: number, total: number, currentFileName?: string) => void;
+  resetProgress: () => void;
 }
 
 export interface HistoryActions {
@@ -43,7 +50,7 @@ export interface CacheActions {
   refreshCacheMetadata: () => void;
 }
 
-export interface AppStore extends AppState, FolderActions, HistoryActions, CacheActions {
+export interface AppStore extends AppState, FolderActions, ProgressActions, HistoryActions, CacheActions {
   initialize: () => void;
 }
 
@@ -62,5 +69,6 @@ export const initialState: AppState = {
   historyRecords: [],
   currentHistoryRecordId: null,
   cacheMetadata: null,
-  isUsingCache: false
+  isUsingCache: false,
+  progressInfo: null
 }; 

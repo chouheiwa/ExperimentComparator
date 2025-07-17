@@ -10,6 +10,7 @@ export const useError = () => useAppStore((state) => state.error);
 export const useHistoryRecords = () => useAppStore((state) => state.historyRecords);
 export const useCacheMetadata = () => useAppStore((state) => state.cacheMetadata);
 export const useIsUsingCache = () => useAppStore((state) => state.isUsingCache);
+export const useProgressInfo = () => useAppStore((state) => state.progressInfo);
 
 // 文件夹相关动作选择器
 export const useSetCurrentStep = () => useAppStore((state) => state.setCurrentStep);
@@ -19,6 +20,11 @@ export const useSetComparisonResults = () => useAppStore((state) => state.setCom
 export const useSetLoading = () => useAppStore((state) => state.setLoading);
 export const useSetError = () => useAppStore((state) => state.setError);
 export const useResetState = () => useAppStore((state) => state.resetState);
+
+// 进度相关动作选择器
+export const useSetProgressInfo = () => useAppStore((state) => state.setProgressInfo);
+export const useUpdateProgress = () => useAppStore((state) => state.updateProgress);
+export const useResetProgress = () => useAppStore((state) => state.resetProgress);
 
 // 历史记录相关动作选择器
 export const useSetHistoryRecords = () => useAppStore((state) => state.setHistoryRecords);

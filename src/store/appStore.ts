@@ -6,6 +6,7 @@ import { AppStore, initialState } from './types';
 import { createFolderActions } from './actions/folderActions';
 import { createHistoryActions } from './actions/historyActions';
 import { createCacheActions } from './actions/cacheActions';
+import { createProgressActions } from './actions/progressActions';
 import { loadHistoryFromStorage } from '../utils/history';
 import { getCacheMetadata } from '../utils';
 
@@ -16,6 +17,7 @@ export const useAppStore = create<AppStore>()(
       
       // 合并所有action creators
       ...createFolderActions(set, get, api),
+      ...createProgressActions(set, get, api),
       ...createHistoryActions(set, get, api),
       ...createCacheActions(set, get, api),
       
