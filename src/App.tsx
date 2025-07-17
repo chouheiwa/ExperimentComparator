@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
+import { listen } from '@tauri-apps/api/event';
 import { Layout, Steps, Alert, Spin, Typography, Row, Col, Switch, Space } from 'antd';
 import { FolderOutlined, CheckCircleOutlined, BarChartOutlined, DatabaseOutlined, EyeOutlined, TableOutlined } from '@ant-design/icons';
 import { ValidationResult, ComparisonResult, FolderData } from './types';
@@ -9,32 +10,42 @@ import {
   useValidationResult, 
   useComparisonResults, 
   useLoading, 
-  useError, 
+  useError,
   useHistoryRecords,
+  useCacheMetadata,
+  useIsUsingCache,
+  useProgressInfo,
   useSetCurrentStep,
   useSetFolders,
   useSetValidationResult,
   useSetComparisonResults,
   useSetLoading,
   useSetError,
-  useSetHistoryRecords,
   useAddHistoryRecord,
   useDeleteHistoryRecord,
   useUpdateHistoryRecord,
   useSetCurrentHistoryRecordId,
   useLoadHistoryRecord,
-  useResetState
-} from './store/appStore';
+  useResetState,
+  useLoadFromCacheIncremental,
+  useSaveToCache,
+  useClearCache,
+  useCleanupCache,
+  useRefreshCacheMetadata,
+  useSetProgressInfo,
+  useUpdateProgress,
+  useResetProgress
+} from './store';
 import { useInitializeApp } from './hooks/useInitializeApp';
-import { getStepTitle } from './utils';
 import FolderSelection from './components/FolderSelection';
 import ValidationResults from './components/ValidationResults';
 import ComparisonView from './components/ComparisonView';
 import AnalysisView from './components/AnalysisView';
 import HistoryPanel from './components/HistoryPanel';
+import ProgressIndicator from './components/ProgressIndicator';
 
 const { Header, Content } = Layout;
-const { Title, Paragraph } = Typography;
+const { Title } = Typography;
 
 const App: React.FC = () => {
   // 初始化应用
@@ -51,6 +62,9 @@ const App: React.FC = () => {
   const loading = useLoading();
   const error = useError();
   const historyRecords = useHistoryRecords();
+  const cacheMetadata = useCacheMetadata();
+  const isUsingCache = useIsUsingCache();
+  const progressInfo = useProgressInfo();
   
   // 动作
   const setCurrentStep = useSetCurrentStep();
@@ -59,13 +73,38 @@ const App: React.FC = () => {
   const setComparisonResults = useSetComparisonResults();
   const setLoading = useSetLoading();
   const setError = useSetError();
-  const setHistoryRecords = useSetHistoryRecords();
   const addHistoryRecord = useAddHistoryRecord();
   const deleteHistoryRecord = useDeleteHistoryRecord();
   const updateHistoryRecord = useUpdateHistoryRecord();
   const setCurrentHistoryRecordId = useSetCurrentHistoryRecordId();
   const loadHistoryRecord = useLoadHistoryRecord();
   const resetState = useResetState();
+  const loadFromCacheIncremental = useLoadFromCacheIncremental();
+  const saveToCache = useSaveToCache();
+  const clearCache = useClearCache();
+  const cleanupCache = useCleanupCache();
+  const refreshCacheMetadata = useRefreshCacheMetadata();
+  const setProgressInfo = useSetProgressInfo();
+  const updateProgress = useUpdateProgress();
+  const resetProgress = useResetProgress();
+
+  // 监听来自 Rust 后端的进度事件
+  useEffect(() => {
+    const unlisten = listen('progress_update', (event) => {
+      const progressData = event.payload as {
+        current: number;
+        total: number;
+        percentage: number;
+        current_file: string;
+      };
+      
+      updateProgress(progressData.current, progressData.total, progressData.current_file);
+    });
+
+    return () => {
+      unlisten.then(fn => fn());
+    };
+  }, [updateProgress]);
 
   const handleFoldersSelected = async (selectedFolders: FolderData) => {
     setFolders(selectedFolders);
@@ -79,7 +118,8 @@ const App: React.FC = () => {
       setValidationResult(result);
       setCurrentStep('validation');
     } catch (err) {
-      setError(err as string);
+      console.error('文件夹验证失败:', err);
+      setError(typeof err === 'string' ? err : '文件夹验证失败，请检查路径是否正确');
     } finally {
       setLoading(false);
     }
@@ -90,29 +130,124 @@ const App: React.FC = () => {
     
     setLoading(true);
     setError(null);
+    resetProgress(); // 重置进度状态
     
     try {
-      const comparisonData = folders.comparison.map(f => ({
-        name: f.name,
-        path: f.path
-      }));
+      console.log('开始增量对比流程...');
       
-      const results = await invoke<ComparisonResult[]>('calculate_comparisons', {
-        originalFolder: folders.original,
-        gtFolder: folders.gt,
-        myFolder: folders.my,
-        comparisonFolders: comparisonData,
-        commonFiles: validationResult.common_files
-      });
-      setComparisonResults(results);
+      // 检查缓存，获取已有结果和需要计算的对比
+      console.log('检查缓存...');
+      const { cachedResults, missingComparisons } = loadFromCacheIncremental(folders);
+      
+      // 如果所有对比都有缓存，直接完成
+      if (missingComparisons.length === 0 && cachedResults.length > 0) {
+        console.log('所有对比都有缓存，直接使用缓存结果');
+        // 保存历史记录
+        addHistoryRecord(folders);
+        setLoading(false);
+        return;
+      }
+      
+      let allResults = [...cachedResults];
+      let hasPartialCache = cachedResults.length > 0;
+      
+      // 只计算缺少缓存的对比
+      if (missingComparisons.length > 0) {
+        console.log(`需要计算 ${missingComparisons.length} 个对比: ${missingComparisons.map((c: any) => c.name).join(', ')}`);
+        
+        // 初始化进度信息
+        const totalFiles = validationResult.common_files.length;
+        updateProgress(0, totalFiles, '开始计算...');
+        
+        const comparisonData = missingComparisons.map((f: any) => ({
+          name: f.name,
+          path: f.path
+        }));
+        
+        console.log('调用后端计算API...');
+        
+        try {
+          const newResults = await invoke<ComparisonResult[]>('calculate_comparisons_with_progress', {
+            originalFolder: folders.original,
+            gtFolder: folders.gt,
+            myFolder: folders.my,
+            comparisonFolders: comparisonData,
+            commonFiles: validationResult.common_files
+          });
+          
+          console.log('新计算完成，合并结果...');
+          
+          // 合并缓存结果和新计算结果
+          if (hasPartialCache) {
+            // 需要合并结果
+            const fileResultMap = new Map<string, ComparisonResult>();
+            
+            // 先添加缓存结果
+            allResults.forEach(result => {
+              fileResultMap.set(result.filename, { ...result });
+            });
+            
+            // 合并新计算的结果
+            newResults.forEach(newResult => {
+              if (fileResultMap.has(newResult.filename)) {
+                const existingResult = fileResultMap.get(newResult.filename)!;
+                // 合并IOU和准确率分数以及路径
+                Object.assign(existingResult.iou_scores, newResult.iou_scores);
+                Object.assign(existingResult.accuracy_scores, newResult.accuracy_scores);
+                Object.assign(existingResult.paths, newResult.paths);
+              } else {
+                fileResultMap.set(newResult.filename, { ...newResult });
+              }
+            });
+            
+            allResults = Array.from(fileResultMap.values());
+          } else {
+            allResults = newResults;
+          }
+          
+          // 保存新计算的结果到缓存
+          console.log('保存新结果到缓存...');
+          const basePaths = {
+            original: folders.original,
+            gt: folders.gt,
+            my: folders.my
+          };
+          saveToCache(basePaths, missingComparisons, newResults);
+        } catch (error) {
+          throw error;
+        }
+      }
+      
+      console.log('设置最终结果...');
+      setComparisonResults(allResults);
       setCurrentStep('comparison');
+      
+      // 设置缓存状态
+      if (hasPartialCache && missingComparisons.length === 0) {
+        // 完全使用缓存
+        console.log('完全使用缓存结果');
+      } else if (hasPartialCache && missingComparisons.length > 0) {
+        // 部分使用缓存
+        console.log('部分使用缓存，部分新计算');
+      } else {
+        // 完全新计算
+        console.log('完全新计算结果');
+      }
+      
+      console.log('对比流程完成');
       
       // 保存历史记录
       addHistoryRecord(folders);
+      
     } catch (err) {
-      setError(err as string);
+      console.error('对比计算失败:', err);
+      setError(typeof err === 'string' ? err : '对比计算失败，请稍后重试');
     } finally {
       setLoading(false);
+      // 延迟重置进度，让用户看到完成状态
+      setTimeout(() => {
+        resetProgress();
+      }, 2000);
     }
   };
 
@@ -157,126 +292,131 @@ const App: React.FC = () => {
         <div style={{ 
           display: 'flex', 
           alignItems: 'center', 
-          justifyContent: 'center',
-          height: '100%'
+          justifyContent: 'space-between',
+          height: '100%' 
         }}>
-          <DatabaseOutlined style={{ fontSize: '32px', color: '#1890ff', marginRight: '16px' }} />
-          <Title level={2} style={{ margin: 0, color: '#333' }}>
-            ExperimentComparator
-          </Title>
-        </div>
-      </Header>
-      
-      <Content style={{ padding: '24px', maxWidth: '1600px', margin: '0 auto', width: '100%' }}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <Paragraph style={{ fontSize: '16px', color: '#666' }}>
-            模型实验结果对比分析工具
-          </Paragraph>
-        </div>
-
-        <Steps 
-          current={getCurrentStepIndex()} 
-          items={steps}
-          style={{ marginBottom: '32px' }}
-        />
-
-        {error && (
-          <Alert
-            message="错误"
-            description={error}
-            type="error"
-            closable
-            onClose={() => setError(null)}
-            style={{ marginBottom: '24px' }}
-          />
-        )}
-
-        <Spin spinning={loading} tip="处理中...">
-          <div style={{ 
-            backgroundColor: '#fff', 
-            borderRadius: '8px', 
-            padding: '32px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ 
-              fontSize: '20px', 
-              fontWeight: 'bold', 
-              marginBottom: '24px',
-              color: '#333',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              {steps[getCurrentStepIndex()].icon}
-              {getStepTitle(currentStep)}
-            </div>
-
-            {currentStep === 'folder-selection' && (
-              <Row gutter={[24, 24]}>
-                <Col xs={24} md={24} lg={16} xl={18}>
-                  <FolderSelection
-                    onFoldersSelected={handleFoldersSelected}
-                    loading={loading}
-                    folders={folders}
-                    onMainFoldersChanged={() => setCurrentHistoryRecordId(null)}
-                  />
-                </Col>
-                <Col xs={24} md={24} lg={8} xl={6}>
-                  <HistoryPanel
-                    records={historyRecords}
-                    onLoadRecord={loadHistoryRecord}
-                    onDeleteRecord={deleteHistoryRecord}
-                    onUpdateRecord={updateHistoryRecord}
-                    onImportRecords={(records) => {
-                      setHistoryRecords([...records, ...historyRecords]);
-                    }}
-                    loading={loading}
-                  />
-                </Col>
-              </Row>
-            )}
-
-            {currentStep === 'validation' && validationResult && (
-              <ValidationResults
-                result={validationResult}
-                onStartComparison={handleStartComparison}
-                onReset={handleReset}
-                loading={loading}
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
+              实验结果对比工具
+            </Title>
+            {currentStep === 'comparison' && isUsingCache && (
+              <Alert
+                message="已使用缓存结果"
+                description="当前显示的是之前计算过的缓存结果"
+                type="info"
+                showIcon
+                style={{ marginLeft: '16px' }}
               />
             )}
-
-            {currentStep === 'comparison' && comparisonResults.length > 0 && (
-              <div>
-                <div style={{ marginBottom: '16px', textAlign: 'center' }}>
-                  <Space align="center">
-                    <EyeOutlined />
-                    <span>浏览模式</span>
-                    <Switch
-                      checked={useAnalysisView}
-                      onChange={setUseAnalysisView}
-                      checkedChildren="分析"
-                      unCheckedChildren="详细"
-                    />
-                    <TableOutlined />
-                    <span>分析模式</span>
-                  </Space>
-                </div>
-                {useAnalysisView ? (
-                  <AnalysisView
-                    results={comparisonResults}
-                    onReset={handleReset}
-                  />
-                ) : (
-                  <ComparisonView
-                    results={comparisonResults}
-                    onReset={handleReset}
-                  />
-                )}
-              </div>
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {currentStep === 'comparison' && (
+              <Space>
+                <Switch
+                  checked={useAnalysisView}
+                  onChange={setUseAnalysisView}
+                  checkedChildren={<TableOutlined />}
+                  unCheckedChildren={<EyeOutlined />}
+                />
+                <span style={{ color: '#666' }}>
+                  {useAnalysisView ? '分析视图' : '对比视图'}
+                </span>
+              </Space>
+            )}
+            
+            {cacheMetadata && (
+              <Space>
+                <DatabaseOutlined style={{ color: '#1890ff' }} />
+                <span style={{ color: '#666' }}>
+                  缓存: {cacheMetadata.count} 项
+                </span>
+              </Space>
             )}
           </div>
-        </Spin>
-      </Content>
+        </div>
+      </Header>
+
+      <Layout>
+        <Content style={{ padding: '24px' }}>
+          <Row gutter={24}>
+            <Col span={currentStep === 'validation' ? 24 : 18}>
+              <div style={{ backgroundColor: '#fff', padding: '24px', borderRadius: '8px', marginBottom: '24px' }}>
+                <Steps
+                  current={getCurrentStepIndex()}
+                  items={steps}
+                  style={{ marginBottom: '32px' }}
+                />
+
+                {error && (
+                  <Alert
+                    message="操作失败"
+                    description={error}
+                    type="error"
+                    closable
+                    onClose={() => setError(null)}
+                    style={{ marginBottom: '24px' }}
+                  />
+                )}
+
+                {/* 根据是否有进度信息来决定显示方式 */}
+                {progressInfo ? (
+                  <div>
+                    <ProgressIndicator progressInfo={progressInfo} />
+                    {/* 进度条显示时不显示其他内容 */}
+                  </div>
+                ) : (
+                  <Spin spinning={loading} tip="处理中...">
+                    {currentStep === 'folder-selection' && (
+                      <FolderSelection
+                        onFoldersSelected={handleFoldersSelected}
+                        loading={loading}
+                        folders={folders}
+                        onMainFoldersChanged={() => setCurrentHistoryRecordId(null)}
+                      />
+                    )}
+
+                    {currentStep === 'validation' && validationResult && (
+                      <ValidationResults
+                        result={validationResult}
+                        onStartComparison={handleStartComparison}
+                        onReset={handleReset}
+                        loading={loading}
+                      />
+                    )}
+
+                    {currentStep === 'comparison' && comparisonResults.length > 0 && (
+                      <>
+                        {useAnalysisView ? (
+                          <AnalysisView results={comparisonResults} onReset={handleReset} />
+                        ) : (
+                          <ComparisonView results={comparisonResults} onReset={handleReset} />
+                        )}
+                      </>
+                    )}
+                  </Spin>
+                )}
+              </div>
+            </Col>
+            
+            {/* 只在非验证步骤时显示历史记录面板 */}
+            {currentStep !== 'validation' && (
+              <Col span={6}>
+                <HistoryPanel
+                  records={historyRecords}
+                  onLoadRecord={loadHistoryRecord}
+                  onDeleteRecord={deleteHistoryRecord}
+                  onUpdateRecord={updateHistoryRecord}
+                  onClearCache={clearCache}
+                  onCleanupCache={cleanupCache}
+                  cacheMetadata={cacheMetadata}
+                  onRefreshCache={refreshCacheMetadata}
+                />
+              </Col>
+            )}
+          </Row>
+        </Content>
+      </Layout>
     </Layout>
   );
 };

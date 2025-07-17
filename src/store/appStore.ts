@@ -2,257 +2,33 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { subscribeWithSelector } from 'zustand/middleware';
 
-import { 
-  AppState, 
-  Step, 
-  FolderData, 
-  ValidationResult, 
-  ComparisonResult, 
-  HistoryRecord 
-} from '../types';
-import { 
-  loadHistoryFromStorage, 
-  saveHistoryToStorage, 
-  createHistoryRecord,
-  isDuplicateFolders 
-} from '../utils/history';
-
-interface AppStore extends AppState {
-  // Actions
-  setCurrentStep: (step: Step) => void;
-  setFolders: (folders: FolderData) => void;
-  setValidationResult: (result: ValidationResult | null) => void;
-  setComparisonResults: (results: ComparisonResult[]) => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
-  setHistoryRecords: (records: HistoryRecord[]) => void;
-  addHistoryRecord: (folders: FolderData, name?: string, description?: string) => HistoryRecord | null;
-  deleteHistoryRecord: (id: string) => void;
-  updateHistoryRecord: (id: string, name: string, description?: string) => void;
-  setCurrentHistoryRecordId: (id: string | null) => void;
-  loadHistoryRecord: (record: HistoryRecord) => void;
-  resetState: () => void;
-  initialize: () => void;
-}
-
-const initialState: AppState = {
-  currentStep: 'folder-selection',
-  folders: {
-    original: '',
-    gt: '',
-    my: '',
-    comparison: []
-  },
-  validationResult: null,
-  comparisonResults: [],
-  loading: false,
-  error: null,
-  historyRecords: [],
-  currentHistoryRecordId: null
-};
+import { AppStore, initialState } from './types';
+import { createFolderActions } from './actions/folderActions';
+import { createHistoryActions } from './actions/historyActions';
+import { createCacheActions } from './actions/cacheActions';
+import { createProgressActions } from './actions/progressActions';
+import { loadHistoryFromStorage } from '../utils/history';
+import { getCacheMetadata } from '../utils';
 
 export const useAppStore = create<AppStore>()(
   subscribeWithSelector(
-    immer((set, get) => ({
+    immer((set, get, api) => ({
       ...initialState,
       
-      setCurrentStep: (step: Step) => {
-        set((state) => {
-          state.currentStep = step;
-        });
-      },
+      // 合并所有action creators
+      ...createFolderActions(set, get, api),
+      ...createProgressActions(set, get, api),
+      ...createHistoryActions(set, get, api),
+      ...createCacheActions(set, get, api),
       
-      setFolders: (folders: FolderData) => {
-        set((state) => {
-          state.folders = folders;
-        });
-      },
-      
-      setValidationResult: (result: ValidationResult | null) => {
-        set((state) => {
-          state.validationResult = result;
-        });
-      },
-      
-      setComparisonResults: (results: ComparisonResult[]) => {
-        set((state) => {
-          state.comparisonResults = results;
-        });
-      },
-      
-      setLoading: (loading: boolean) => {
-        set((state) => {
-          state.loading = loading;
-        });
-      },
-      
-      setError: (error: string | null) => {
-        set((state) => {
-          state.error = error;
-        });
-      },
-      
-      setHistoryRecords: (records: HistoryRecord[]) => {
-        set((state) => {
-          state.historyRecords = records;
-        });
-        saveHistoryToStorage(records);
-      },
-      
-      addHistoryRecord: (folders: FolderData, name?: string, description?: string) => {
-        const currentRecords = get().historyRecords;
-        const currentHistoryRecordId = get().currentHistoryRecordId;
-        
-        // 如果当前有加载的历史记录ID，更新该记录而不是新增
-        if (currentHistoryRecordId) {
-          const recordIndex = currentRecords.findIndex(record => record.id === currentHistoryRecordId);
-          console.log('recordIndex', recordIndex);
-          if (recordIndex !== -1) {
-            const updatedRecord = {
-              ...currentRecords[recordIndex],
-              folders,
-              name: name || currentRecords[recordIndex].name,
-              description: description !== undefined ? description : currentRecords[recordIndex].description
-            };
-            
-            set((state) => {
-              state.historyRecords[recordIndex] = updatedRecord;
-            });
-            
-            const newRecords = get().historyRecords;
-            saveHistoryToStorage(newRecords);
-            return updatedRecord;
-          }
-        }
-        
-        // 检查是否已存在相同的配置
-        if (isDuplicateFolders(folders, currentRecords)) {
-          return null;
-        }
-        
-        const newRecord = createHistoryRecord(folders, name, description);
-        set((state) => {
-          state.historyRecords.unshift(newRecord);
-          // 设置新记录为当前记录
-          state.currentHistoryRecordId = newRecord.id;
-        });
-        
-        const newRecords = get().historyRecords;
-        saveHistoryToStorage(newRecords);
-        return newRecord;
-      },
-      
-      deleteHistoryRecord: (id: string) => {
-        set((state) => {
-          state.historyRecords = state.historyRecords.filter(record => record.id !== id);
-        });
-        
-        const newRecords = get().historyRecords;
-        saveHistoryToStorage(newRecords);
-      },
-      
-      updateHistoryRecord: (id: string, name: string, description?: string) => {
-        set((state) => {
-          const recordIndex = state.historyRecords.findIndex(record => record.id === id);
-          if (recordIndex !== -1) {
-            state.historyRecords[recordIndex].name = name;
-            if (description !== undefined) {
-              state.historyRecords[recordIndex].description = description;
-            }
-          }
-        });
-        
-        const newRecords = get().historyRecords;
-        saveHistoryToStorage(newRecords);
-      },
-      
-      setCurrentHistoryRecordId: (id: string | null) => {
-        set((state) => {
-          state.currentHistoryRecordId = id;
-        });
-      },
-      
-      loadHistoryRecord: (record: HistoryRecord) => {
-        set((state) => {
-          // 处理向后兼容性：如果comparison是字符串数组，转换为ComparisonFolder数组
-          let folders = record.folders;
-          if (folders.comparison.length > 0 && typeof folders.comparison[0] === 'string') {
-            folders = {
-              ...folders,
-              comparison: (folders.comparison as any as string[]).map((path: string, index: number) => ({
-                id: `comp-${Date.now()}-${index}`,
-                name: `对比数据 ${index + 1}`,
-                path: path
-              }))
-            };
-          }
-          
-          // 处理向后兼容性：为旧记录添加默认的original字段
-          if (!folders.original) {
-            folders = {
-              ...folders,
-              original: ''
-            };
-          }
-          
-          state.folders = folders;
-          state.error = null;
-          state.currentStep = 'folder-selection';
-          // 设置当前加载的历史记录ID
-          state.currentHistoryRecordId = record.id;
-        });
-      },
-      
-      resetState: () => {
-        set((state) => {
-          state.currentStep = 'folder-selection';
-          state.folders = {
-            original: '',
-            gt: '',
-            my: '',
-            comparison: []
-          };
-          state.validationResult = null;
-          state.comparisonResults = [];
-          state.loading = false;
-          state.error = null;
-          state.currentHistoryRecordId = null;
-        });
-      },
-      
+      // 应用初始化
       initialize: () => {
         const savedRecords = loadHistoryFromStorage();
         set((state) => {
           state.historyRecords = savedRecords;
+          state.cacheMetadata = getCacheMetadata();
         });
       }
     }))
   )
 );
-
-// 选择器，用于获取特定的状态片段
-export const useCurrentStep = () => useAppStore((state) => state.currentStep);
-export const useFolders = () => useAppStore((state) => state.folders);
-export const useValidationResult = () => useAppStore((state) => state.validationResult);
-export const useComparisonResults = () => useAppStore((state) => state.comparisonResults);
-export const useLoading = () => useAppStore((state) => state.loading);
-export const useError = () => useAppStore((state) => state.error);
-export const useHistoryRecords = () => useAppStore((state) => state.historyRecords);
-
-// 单独的动作选择器 - 避免对象重新创建
-export const useSetCurrentStep = () => useAppStore((state) => state.setCurrentStep);
-export const useSetFolders = () => useAppStore((state) => state.setFolders);
-export const useSetValidationResult = () => useAppStore((state) => state.setValidationResult);
-export const useSetComparisonResults = () => useAppStore((state) => state.setComparisonResults);
-export const useSetLoading = () => useAppStore((state) => state.setLoading);
-export const useSetError = () => useAppStore((state) => state.setError);
-export const useSetHistoryRecords = () => useAppStore((state) => state.setHistoryRecords);
-export const useAddHistoryRecord = () => useAppStore((state) => state.addHistoryRecord);
-export const useDeleteHistoryRecord = () => useAppStore((state) => state.deleteHistoryRecord);
-export const useUpdateHistoryRecord = () => useAppStore((state) => state.updateHistoryRecord);
-export const useSetCurrentHistoryRecordId = () => useAppStore((state) => state.setCurrentHistoryRecordId);
-export const useLoadHistoryRecord = () => useAppStore((state) => state.loadHistoryRecord);
-export const useResetState = () => useAppStore((state) => state.resetState);
-export const useInitialize = () => useAppStore((state) => state.initialize);
-
- 
