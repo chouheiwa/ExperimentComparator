@@ -300,7 +300,7 @@ const App: React.FC = () => {
       <Layout>
         <Content style={{ padding: '24px' }}>
           <Row gutter={24}>
-            <Col span={18}>
+            <Col span={currentStep === 'validation' ? 24 : 18}>
               <div style={{ backgroundColor: '#fff', padding: '24px', borderRadius: '8px', marginBottom: '24px' }}>
                 <Steps
                   current={getCurrentStepIndex()}
@@ -351,18 +351,21 @@ const App: React.FC = () => {
               </div>
             </Col>
             
-            <Col span={6}>
-              <HistoryPanel
-                records={historyRecords}
-                onLoadRecord={loadHistoryRecord}
-                onDeleteRecord={deleteHistoryRecord}
-                onUpdateRecord={updateHistoryRecord}
-                onClearCache={clearCache}
-                onCleanupCache={cleanupCache}
-                cacheMetadata={cacheMetadata}
-                onRefreshCache={refreshCacheMetadata}
-              />
-            </Col>
+            {/* 只在非验证步骤时显示历史记录面板 */}
+            {currentStep !== 'validation' && (
+              <Col span={6}>
+                <HistoryPanel
+                  records={historyRecords}
+                  onLoadRecord={loadHistoryRecord}
+                  onDeleteRecord={deleteHistoryRecord}
+                  onUpdateRecord={updateHistoryRecord}
+                  onClearCache={clearCache}
+                  onCleanupCache={cleanupCache}
+                  cacheMetadata={cacheMetadata}
+                  onRefreshCache={refreshCacheMetadata}
+                />
+              </Col>
+            )}
           </Row>
         </Content>
       </Layout>

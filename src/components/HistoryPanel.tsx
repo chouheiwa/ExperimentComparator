@@ -23,7 +23,6 @@ import {
   UploadOutlined, 
   PlayCircleOutlined,
   EditOutlined,
-  FolderOutlined,
   CalendarOutlined,
   DatabaseOutlined,
   ClearOutlined,

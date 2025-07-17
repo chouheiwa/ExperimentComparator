@@ -45,19 +45,39 @@ export const createCacheActions: StateCreator<
     const missingComparisons: ComparisonFolder[] = [];
     let hasCache = false;
     
+    // 首先检查"我的结果"的缓存
+    const myResultsCache = getCachedSingleComparison(basePaths, basePaths.my);
+    if (myResultsCache) {
+      console.log(`找到缓存: 我的结果`);
+      // 更新路径信息
+      myResultsCache.results.forEach(result => {
+        result.paths['原始图片'] = `${basePaths.original}/${result.filename}`;
+        result.paths['GT'] = `${basePaths.gt}/${result.filename}`;
+        result.paths['我的结果'] = `${basePaths.my}/${result.filename}`;
+      });
+      cachedResults.push(...myResultsCache.results);
+      hasCache = true;
+    }
+    
     // 检查每个对比文件夹的缓存
     folders.comparison.forEach(compFolder => {
       const cachedComparison = getCachedSingleComparison(basePaths, compFolder.path);
       
       if (cachedComparison) {
         console.log(`找到缓存: ${compFolder.name}`);
-        // 更新缓存结果中的名称映射
+        // 更新缓存结果中的名称映射和路径信息
         cachedComparison.results.forEach(result => {
           // 将缓存中的名称更新为当前名称
           if (result.iou_scores[cachedComparison.comparisonName]) {
             result.iou_scores[compFolder.name] = result.iou_scores[cachedComparison.comparisonName];
             result.accuracy_scores[compFolder.name] = result.accuracy_scores[cachedComparison.comparisonName];
-            result.paths[compFolder.name] = result.paths[cachedComparison.comparisonName];
+            
+            // 重要：根据当前基础路径更新图片路径
+            // 只更新基础路径和当前对比文件夹路径，不影响其他对比文件夹的路径
+            result.paths['原始图片'] = `${basePaths.original}/${result.filename}`;
+            result.paths['GT'] = `${basePaths.gt}/${result.filename}`;
+            result.paths['我的结果'] = `${basePaths.my}/${result.filename}`;
+            result.paths[compFolder.name] = `${compFolder.path}/${result.filename}`;
             
             // 如果名称不同，删除旧的映射
             if (cachedComparison.comparisonName !== compFolder.name) {
@@ -143,6 +163,32 @@ export const createCacheActions: StateCreator<
         console.log(`已保存缓存: ${compFolder.name}`);
       }
     });
+    
+    // 同时为"我的结果"创建缓存记录
+    const myResultsData = results.map(result => ({
+      ...result,
+      iou_scores: { '我的结果': result.iou_scores['我的结果'] },
+      accuracy_scores: { '我的结果': result.accuracy_scores['我的结果'] },
+      paths: { 
+        '原始图片': result.paths['原始图片'],
+        'GT': result.paths['GT'],
+        '我的结果': result.paths['我的结果']
+      }
+    })).filter(result => 
+      result.iou_scores['我的结果'] !== undefined || 
+      result.accuracy_scores['我的结果'] !== undefined
+    );
+    
+    if (myResultsData.length > 0) {
+      const myResultsCacheResult = createSingleComparisonCache(
+        basePaths,
+        '我的结果',
+        basePaths.my,
+        myResultsData
+      );
+      saveSingleComparisonCache(myResultsCacheResult);
+      console.log(`已保存缓存: 我的结果`);
+    }
     
     // 刷新缓存元数据
     get().refreshCacheMetadata();
