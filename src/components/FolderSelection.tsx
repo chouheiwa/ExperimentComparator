@@ -1,9 +1,28 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Card, Button, Space, Tag, Alert, Row, Col, Typography, Input, Modal } from 'antd';
-import { DeleteOutlined, PlusOutlined, InboxOutlined, EditOutlined } from '@ant-design/icons';
+import { DeleteOutlined, PlusOutlined, InboxOutlined, EditOutlined, HolderOutlined } from '@ant-design/icons';
 import { listen } from '@tauri-apps/api/event';
 import { dirname } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/tauri';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { FolderData, ComparisonFolder } from '../types';
 import FolderDropzone from './FolderDropzone';
 
@@ -15,6 +34,136 @@ interface FolderSelectionProps {
   folders?: FolderData;
   onMainFoldersChanged?: () => void; // 主要文件夹变化时清除历史记录ID
 }
+
+// 可拖拽的对比文件夹项组件
+interface SortableComparisonFolderProps {
+  folder: ComparisonFolder;
+  editingId: string | null;
+  editingName: string;
+  loading: boolean;
+  onStartEditing: (folder: ComparisonFolder) => void;
+  onSaveEditing: () => void;
+  onCancelEditing: () => void;
+  onRemove: (id: string) => void;
+  onEditingNameChange: (name: string) => void;
+}
+
+const SortableComparisonFolder: React.FC<SortableComparisonFolderProps> = ({
+  folder,
+  editingId,
+  editingName,
+  loading,
+  onStartEditing,
+  onSaveEditing,
+  onCancelEditing,
+  onRemove,
+  onEditingNameChange,
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: folder.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="sortable-comparison-folder"
+    >
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        padding: '12px 16px',
+        backgroundColor: '#f5f5f5',
+        borderRadius: '6px',
+        border: isDragging ? '2px dashed #1890ff' : '1px solid #d9d9d9',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {/* 拖拽手柄 */}
+          <div
+            {...attributes}
+            {...listeners}
+            style={{
+              cursor: 'grab',
+              marginRight: '12px',
+              color: '#999',
+              fontSize: '16px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="拖拽以重新排序"
+          >
+            <HolderOutlined />
+          </div>
+          
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+              <Tag color="green" style={{ marginRight: '8px' }}>
+                {editingId === folder.id ? (
+                  <Input
+                    value={editingName}
+                    onChange={(e) => onEditingNameChange(e.target.value)}
+                    onPressEnter={onSaveEditing}
+                    onBlur={onSaveEditing}
+                    style={{ width: '120px' }}
+                    autoFocus
+                  />
+                ) : (
+                  folder.name
+                )}
+              </Tag>
+              {editingId !== folder.id && (
+                <Button
+                  type="text"
+                  icon={<EditOutlined />}
+                  size="small"
+                  onClick={() => onStartEditing(folder)}
+                  disabled={loading}
+                  style={{ marginLeft: '4px' }}
+                />
+              )}
+            </div>
+            <span style={{ fontSize: '12px', color: '#666' }}>
+              {folder.path}
+            </span>
+          </div>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {editingId === folder.id && (
+            <Button
+              size="small"
+              onClick={onCancelEditing}
+              disabled={loading}
+            >
+              取消
+            </Button>
+          )}
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            size="small"
+            onClick={() => onRemove(folder.id)}
+            title="移除"
+            disabled={loading}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // 生成唯一ID
 const generateId = (): string => {
@@ -40,6 +189,14 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
   const [modalInputValue, setModalInputValue] = useState('');
   const [pendingFolderPath, setPendingFolderPath] = useState<string | null>(null);
 
+  // 拖拽传感器配置
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   // 使用ref来确保拖放处理函数中能获取到最新的状态值
   const originalFolderRef = useRef(originalFolder);
   const gtFolderRef = useRef(gtFolder);
@@ -61,6 +218,18 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
 
   useEffect(() => {
     comparisonFoldersRef.current = comparisonFolders;
+  }, [comparisonFolders]);
+
+  // 拖拽结束处理
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = comparisonFolders.findIndex((folder) => folder.id === active.id);
+      const newIndex = comparisonFolders.findIndex((folder) => folder.id === over.id);
+
+      setComparisonFolders((folders) => arrayMove(folders, oldIndex, newIndex));
+    }
   }, [comparisonFolders]);
 
   // 监听外部folders属性变化，同步更新本地状态
@@ -378,70 +547,33 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
           }
           style={{ marginTop: '24px' }}
         >
-          <Space direction="vertical" style={{ width: '100%' }}>
-            {comparisonFolders.map((folder) => (
-              <div key={folder.id} style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                backgroundColor: '#f5f5f5',
-                borderRadius: '6px'
-              }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
-                    <Tag color="green" style={{ marginRight: '8px' }}>
-                      {editingId === folder.id ? (
-                        <Input
-                          value={editingName}
-                          onChange={(e) => setEditingName(e.target.value)}
-                          onPressEnter={saveEditing}
-                          onBlur={saveEditing}
-                          style={{ width: '120px' }}
-                          autoFocus
-                        />
-                      ) : (
-                        folder.name
-                      )}
-                    </Tag>
-                    {editingId !== folder.id && (
-                      <Button
-                        type="text"
-                        icon={<EditOutlined />}
-                        size="small"
-                        onClick={() => startEditing(folder)}
-                        disabled={loading}
-                        style={{ marginLeft: '4px' }}
-                      />
-                    )}
-                  </div>
-                  <span style={{ fontSize: '12px', color: '#666' }}>
-                    {folder.path}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {editingId === folder.id && (
-                    <Button
-                      size="small"
-                      onClick={cancelEditing}
-                      disabled={loading}
-                    >
-                      取消
-                    </Button>
-                  )}
-                  <Button
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                    size="small"
-                    onClick={() => removeComparisonFolder(folder.id)}
-                    title="移除"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-            ))}
-          </Space>
+                     <DndContext
+             sensors={sensors}
+             collisionDetection={closestCenter}
+             onDragEnd={handleDragEnd}
+           >
+             <SortableContext
+               items={comparisonFolders.map(folder => folder.id)}
+               strategy={verticalListSortingStrategy}
+             >
+               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                 {comparisonFolders.map((folder) => (
+                   <SortableComparisonFolder
+                     key={folder.id}
+                     folder={folder}
+                     editingId={editingId}
+                     editingName={editingName}
+                     loading={loading}
+                     onStartEditing={startEditing}
+                     onSaveEditing={saveEditing}
+                     onCancelEditing={cancelEditing}
+                     onRemove={removeComparisonFolder}
+                     onEditingNameChange={setEditingName}
+                   />
+                 ))}
+               </div>
+             </SortableContext>
+           </DndContext>
         </Card>
       )}
 
@@ -493,4 +625,4 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
   );
 };
 
-export default FolderSelection; 
+export default FolderSelection;
