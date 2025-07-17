@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Card, Button, Select, Switch, Row, Col, Typography, Tag, Space, Modal, message } from 'antd';
 import { DownloadOutlined, StarOutlined, StarFilled } from '@ant-design/icons';
+import { invoke } from '@tauri-apps/api/tauri';
 import { ComparisonResult } from '../types';
 import ImageComparisonGrid from './ImageComparisonGrid';
 import SafeImage from './SafeImage';
@@ -157,39 +158,50 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
     });
   };
 
-  // 导出选中的图像信息
-  const exportSelectedImages = () => {
+  // 导出选中的图像文件
+  const exportSelectedImages = async () => {
     if (selectedImages.size === 0) {
       message.warning('请先选择要导出的图像');
       return;
     }
     
-    const selectedData = filteredAndSortedData.filter(d => selectedImages.has(d.filename));
-    const exportData = {
-      timestamp: new Date().toISOString(),
-      selection_criteria: { sortBy, sortOrder, filterBy },
-      selected_images: selectedData.map(d => ({
-        filename: d.filename,
-        category: d.category,
-        avg_iou: d.avgIou,
-        max_iou: d.maxIou,
-        min_iou: d.minIou,
-        iou_variance: d.iouVariance,
-        avg_accuracy: d.avgAccuracy
-      }))
-    };
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `analysis_export_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    message.success(`成功导出 ${selectedImages.size} 个图像的分析数据`);
+    try {
+      message.loading('正在选择导出文件夹...', 0);
+      
+      // 1. 让用户选择导出文件夹
+      const exportFolder = await invoke<string>('select_export_folder');
+      message.destroy();
+      
+      if (!exportFolder) {
+        message.info('已取消导出');
+        return;
+      }
+      
+      // 2. 准备导出数据
+      const selectedResults = results.filter(r => selectedImages.has(r.filename));
+      const imageFiles = selectedResults.map(result => ({
+        filename: result.filename,
+        model_paths: result.paths // 保持模型名称和路径的对应关系
+      }));
+      
+      message.loading('正在导出图片文件...', 0);
+      
+      // 3. 调用后端命令导出图片
+      const exportResult = await invoke<string>('export_selected_images', {
+        request: {
+          export_folder: exportFolder,
+          image_files: imageFiles
+        }
+      });
+      
+      message.destroy();
+      message.success(exportResult);
+      
+    } catch (error) {
+      message.destroy();
+      console.error('导出失败:', error);
+      message.error(`导出失败: ${error}`);
+    }
   };
 
 
@@ -285,8 +297,9 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
                 onClick={exportSelectedImages}
                 size="small"
                 disabled={selectedImages.size === 0}
+                type="primary"
               >
-                导出选中
+                导出图片
               </Button>
             </Space>
           </Col>

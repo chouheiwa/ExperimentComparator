@@ -74,7 +74,7 @@ fn calculate_iou(img1_path: &str, img2_path: &str) -> Result<f64, String> {
     let (width2, height2) = img2.dimensions();
     
     if width1 != width2 || height1 != height2 {
-        return Err("图片尺寸不匹配".to_string());
+        return Err(format!("图片尺寸: {}x{} 对 {}x{} 不匹配: {} vs {}", width1, height1, width2, height2, img1_path, img2_path));
     }
     
     let img1_gray = img1.to_luma8();
@@ -295,6 +295,89 @@ async fn calculate_comparisons(
     Ok(results)
 }
 
+#[tauri::command]
+async fn select_export_folder() -> Result<String, String> {
+    use tauri::api::dialog::blocking::FileDialogBuilder;
+    
+    match FileDialogBuilder::new()
+        .set_title("选择导出文件夹")
+        .pick_folder() 
+    {
+        Some(path) => Ok(path.to_string_lossy().to_string()),
+        None => Err("未选择导出文件夹".to_string()),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ExportImageRequest {
+    export_folder: String,
+    image_files: Vec<ExportImageInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExportImageInfo {
+    filename: String,
+    model_paths: std::collections::HashMap<String, String>, // 模型名称到路径的映射
+}
+
+#[tauri::command]
+async fn export_selected_images(request: ExportImageRequest) -> Result<String, String> {
+    use std::path::Path;
+    use std::fs;
+    
+    let export_path = Path::new(&request.export_folder);
+    if !export_path.exists() {
+        return Err("导出文件夹不存在".to_string());
+    }
+    
+    let mut success_count = 0;
+    let mut error_files = Vec::new();
+    let total_files = request.image_files.len();
+    
+    for image_info in &request.image_files {
+        // 为每个图片创建子文件夹
+        let image_folder = export_path.join(&image_info.filename.replace(".", "_"));
+        if let Err(e) = fs::create_dir_all(&image_folder) {
+            error_files.push(format!("创建文件夹失败 {}: {}", image_info.filename, e));
+            continue;
+        }
+        
+        // 复制所有版本的图片到对应子文件夹
+        for (model_name, source_path) in &image_info.model_paths {
+            let source = Path::new(source_path);
+            if !source.exists() {
+                error_files.push(format!("源文件不存在: {}", source_path));
+                continue;
+            }
+            
+            // 使用模型名称作为前缀，去除特殊字符
+            let safe_model_name = model_name.replace("/", "_").replace("\\", "_").replace(":", "_");
+            let dest_filename = format!("{}_{}", safe_model_name, image_info.filename);
+            let dest_path = image_folder.join(dest_filename);
+            
+            if let Err(e) = fs::copy(source, &dest_path) {
+                error_files.push(format!("复制文件失败 {} -> {}: {}", 
+                    source_path, dest_path.display(), e));
+                continue;
+            }
+        }
+        
+        success_count += 1;
+    }
+    
+    if error_files.is_empty() {
+        Ok(format!("成功导出 {} 个图片到 {}", success_count, request.export_folder))
+    } else {
+        let error_msg = format!("部分导出成功 ({}/{}): {}", 
+            success_count, total_files, error_files.join("; "));
+        if success_count == 0 {
+            Err(error_msg)
+        } else {
+            Ok(error_msg)
+        }
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -302,7 +385,9 @@ fn main() {
             is_file,
             get_folder_files,
             validate_folders,
-            calculate_comparisons
+            calculate_comparisons,
+            select_export_folder,
+            export_selected_images
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
