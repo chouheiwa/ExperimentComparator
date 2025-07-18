@@ -7,7 +7,7 @@ export const createProgressActions: StateCreator<
   [["zustand/immer", never]],
   [],
   ProgressActions
-> = (set, get) => ({
+> = (set, _get) => ({
   setProgressInfo: (progress: ProgressInfo | null) => {
     set((state) => {
       state.progressInfo = progress;

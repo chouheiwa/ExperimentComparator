@@ -1,5 +1,5 @@
 import React from 'react';
-import { Progress, Card, Typography, Space, Statistic, Row, Col } from 'antd';
+import { Progress, Card, Typography, Row, Col } from 'antd';
 import { ClockCircleOutlined, FileTextOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { ProgressInfo } from '../types';
 

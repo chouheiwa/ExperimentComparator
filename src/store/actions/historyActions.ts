@@ -118,7 +118,6 @@ export const createHistoryActions: StateCreator<
       
       state.folders = folders;
       state.error = null;
-      state.currentStep = 'folder-selection';
       // 设置当前加载的历史记录ID
       state.currentHistoryRecordId = record.id;
       // 重置缓存状态

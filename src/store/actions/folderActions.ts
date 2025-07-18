@@ -1,7 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppStore, FolderActions } from '../types';
 import { 
-  Step, 
   FolderData, 
   ValidationResult, 
   ComparisonResult 
@@ -13,12 +12,6 @@ export const createFolderActions: StateCreator<
   [],
   FolderActions
 > = (set, _get, _api) => ({
-  setCurrentStep: (step: Step) => {
-    set((state) => {
-      state.currentStep = step;
-    });
-  },
-  
   setFolders: (folders: FolderData) => {
     set((state) => {
       state.folders = folders;
@@ -51,7 +44,6 @@ export const createFolderActions: StateCreator<
   
   resetState: () => {
     set((state) => {
-      state.currentStep = 'folder-selection';
       state.folders = {
         original: '',
         gt: '',

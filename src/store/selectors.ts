@@ -1,7 +1,6 @@
 import { useAppStore } from './appStore';
 
 // 状态选择器
-export const useCurrentStep = () => useAppStore((state) => state.currentStep);
 export const useFolders = () => useAppStore((state) => state.folders);
 export const useValidationResult = () => useAppStore((state) => state.validationResult);
 export const useComparisonResults = () => useAppStore((state) => state.comparisonResults);
@@ -13,7 +12,6 @@ export const useIsUsingCache = () => useAppStore((state) => state.isUsingCache);
 export const useProgressInfo = () => useAppStore((state) => state.progressInfo);
 
 // 文件夹相关动作选择器
-export const useSetCurrentStep = () => useAppStore((state) => state.setCurrentStep);
 export const useSetFolders = () => useAppStore((state) => state.setFolders);
 export const useSetValidationResult = () => useAppStore((state) => state.setValidationResult);
 export const useSetComparisonResults = () => useAppStore((state) => state.setComparisonResults);
@@ -42,6 +40,7 @@ export const useSaveToCache = () => useAppStore((state) => state.saveToCache);
 export const useClearCache = () => useAppStore((state) => state.clearCache);
 export const useCleanupCache = () => useAppStore((state) => state.cleanupCache);
 export const useRefreshCacheMetadata = () => useAppStore((state) => state.refreshCacheMetadata);
+export const useGetAllCacheDetails = () => useAppStore((state) => state.getAllCacheDetails);
 
 // 通用动作选择器
 export const useInitialize = () => useAppStore((state) => state.initialize); 

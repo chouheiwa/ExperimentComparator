@@ -22,11 +22,12 @@ export const useAppStore = create<AppStore>()(
       ...createCacheActions(set, get, api),
       
       // 应用初始化
-      initialize: () => {
+      initialize: async () => {
         const savedRecords = loadHistoryFromStorage();
+        const cacheMetadata = await getCacheMetadata();
         set((state) => {
           state.historyRecords = savedRecords;
-          state.cacheMetadata = getCacheMetadata();
+          state.cacheMetadata = cacheMetadata;
         });
       }
     }))

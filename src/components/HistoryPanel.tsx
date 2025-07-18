@@ -12,7 +12,9 @@ import {
   Tooltip,
   Empty,
   Statistic,
-  Alert
+  Alert,
+  Collapse,
+  Tag
 } from 'antd';
 import { save, open } from '@tauri-apps/api/dialog';
 import { writeTextFile, readTextFile } from '@tauri-apps/api/fs';
@@ -26,14 +28,104 @@ import {
   CalendarOutlined,
   DatabaseOutlined,
   ClearOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  FolderOpenOutlined
 } from '@ant-design/icons';
-import { HistoryRecord, CacheMetadata } from '../types';
+import { HistoryRecord, CacheMetadata, CachedSingleComparison } from '../types';
 import { exportHistoryToJson, importHistoryFromJson } from '../utils/history';
 import { formatCacheSize } from '../utils';
 
 const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
+
+// 缓存详情展开组件
+interface CacheDetailsCollapseProps {
+  onGetAllCacheDetails: () => Promise<CachedSingleComparison[]>;
+}
+
+const CacheDetailsCollapse: React.FC<CacheDetailsCollapseProps> = ({ onGetAllCacheDetails }) => {
+  const [cacheDetails, setCacheDetails] = useState<CachedSingleComparison[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const loadCacheDetails = async () => {
+    if (loading) return;
+    
+    setLoading(true);
+    try {
+      const details = await onGetAllCacheDetails();
+      setCacheDetails(details);
+    } catch (error) {
+      console.error('加载缓存详情失败:', error);
+      setCacheDetails([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Collapse
+      size="small"
+      ghost
+      onChange={(keys) => {
+        if (keys.length > 0) {
+          loadCacheDetails();
+        }
+      }}
+      items={[
+        {
+          key: 'cache-details',
+          label: (
+            <Space>
+              <FolderOpenOutlined />
+              <span>查看缓存详情</span>
+            </Space>
+          ),
+          children: loading ? (
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              <Space>
+                <span>加载中...</span>
+              </Space>
+            </div>
+          ) : (
+            <List
+              size="small"
+              dataSource={cacheDetails}
+              renderItem={(item) => (
+                <List.Item style={{ padding: '8px 0' }}>
+                  <List.Item.Meta
+                    avatar={<FolderOpenOutlined style={{ color: '#1890ff', fontSize: '16px' }} />}
+                    title={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 500 }}>{item.comparisonName}</span>
+                        <Tag color="blue" style={{ fontSize: '10px', padding: '0 4px', height: '18px', lineHeight: '16px' }}>
+                          {item.results.length} 文件
+                        </Tag>
+                      </div>
+                    }
+                    description={
+                      <div style={{ fontSize: '11px', color: '#666', lineHeight: '1.4' }}>
+                        <div>
+                          <strong>GT:</strong> {item.basePaths.gt}
+                        </div>
+                        <div>
+                          <strong>对比:</strong> {item.comparisonPath}
+                        </div>
+                        <div>
+                          <strong>最后访问:</strong> {new Date(item.lastAccessedAt).toLocaleString()}
+                        </div>
+                      </div>
+                    }
+                  />
+                </List.Item>
+              )}
+              style={{ maxHeight: '200px', overflow: 'auto' }}
+            />
+          )
+        }
+      ]}
+    />
+  );
+};
 
 interface HistoryPanelProps {
   records: HistoryRecord[];
@@ -43,10 +135,11 @@ interface HistoryPanelProps {
   onImportRecords?: (records: HistoryRecord[]) => void;
   loading?: boolean;
   // 缓存管理相关
-  onClearCache?: () => void;
-  onCleanupCache?: (maxAge?: number) => number;
+  onClearCache?: () => Promise<void>;
+  onCleanupCache?: (maxAge?: number) => Promise<number>;
   cacheMetadata?: CacheMetadata | null;
-  onRefreshCache?: () => void;
+  onRefreshCache?: () => Promise<void>;
+  onGetAllCacheDetails?: () => Promise<CachedSingleComparison[]>;
 }
 
 const HistoryPanel: React.FC<HistoryPanelProps> = ({
@@ -59,7 +152,8 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   onClearCache,
   onCleanupCache,
   cacheMetadata,
-  onRefreshCache
+  onRefreshCache,
+  onGetAllCacheDetails
 }) => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState<HistoryRecord | null>(null);
@@ -142,20 +236,28 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
     message.success('记录更新成功！');
   };
 
-  const handleClearCache = () => {
+    const handleClearCache = async () => {
     if (onClearCache) {
-      onClearCache();
-      message.success('缓存已清空！');
+      try {
+        await onClearCache();
+        message.success('缓存已清空！');
+      } catch (error) {
+        message.error('清空缓存失败');
+      }
     }
   };
-
-  const handleCleanupCache = () => {
+  
+  const handleCleanupCache = async () => {
     if (onCleanupCache) {
-      const deletedCount = onCleanupCache(30); // 清理30天前的缓存
-      if (deletedCount > 0) {
-        message.success(`已清理 ${deletedCount} 个过期缓存项！`);
-      } else {
-        message.info('没有发现过期的缓存项');
+      try {
+        const deletedCount = await onCleanupCache(30); // 清理30天前的缓存
+        if (deletedCount > 0) {
+          message.success(`已清理 ${deletedCount} 个过期缓存项！`);
+        } else {
+          message.info('没有发现过期的缓存项');
+        }
+      } catch (error) {
+        message.error('清理缓存失败');
       }
     }
   };
@@ -409,13 +511,20 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
               </div>
               
               {cacheMetadata.count > 0 && (
-                <Alert
-                  message="缓存说明"
-                  description="缓存可以加速重复计算，但会占用存储空间。建议定期清理过期缓存。"
-                  type="info"
-                  showIcon
-                  style={{ fontSize: '12px' }}
-                />
+                <>
+                  <Alert
+                    message="缓存说明"
+                    description="缓存可以加速重复计算，但会占用存储空间。建议定期清理过期缓存。"
+                    type="info"
+                    showIcon
+                    style={{ fontSize: '12px' }}
+                  />
+                  
+                                    {/* 缓存详情展开 */}
+                  {onGetAllCacheDetails && (
+                    <CacheDetailsCollapse onGetAllCacheDetails={onGetAllCacheDetails} />
+                  )}
+                </>
               )}
               
               <Space style={{ width: '100%', justifyContent: 'center' }}>
