@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Button, Typography, Space, Row, Col, Statistic, Switch, message, Modal } from 'antd';
-import { LeftOutlined, RightOutlined, ReloadOutlined, BarChartOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons';
+import { LeftOutlined, RightOutlined, ReloadOutlined, BarChartOutlined, DownloadOutlined } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/tauri';
 import { ComparisonResult } from '../types';
 import { getIouStatus } from '../utils';
