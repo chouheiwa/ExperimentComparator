@@ -74,7 +74,6 @@ export interface HistoryRecord {
 }
 
 export interface AppState {
-  currentStep: Step;
   folders: FolderData;
   validationResult: ValidationResult | null;
   comparisonResults: ComparisonResult[];

@@ -8,12 +8,13 @@ import {
   ComparisonFolder
 } from '../../types';
 import {
-  getCachedSingleComparison,
   saveSingleComparisonCache,
   createSingleComparisonCache,
   clearAllCache,
   getCacheMetadata,
-  cleanupExpiredCache
+  cleanupExpiredCache,
+  getAllCacheDetails,
+  getCachedSingleComparison
 } from '../../utils';
 
 export const createCacheActions: StateCreator<
@@ -34,186 +35,189 @@ export const createCacheActions: StateCreator<
     });
   },
   
-  loadFromCacheIncremental: (folders: FolderData) => {
-    const basePaths: BaseFolderPaths = {
-      original: folders.original,
-      gt: folders.gt,
-      my: folders.my
-    };
-    
-    const cachedResults: ComparisonResult[] = [];
-    const missingComparisons: ComparisonFolder[] = [];
-    let hasCache = false;
-    
-    // 首先检查"我的结果"的缓存
-    const myResultsCache = getCachedSingleComparison(basePaths, basePaths.my);
-    if (myResultsCache) {
-      console.log(`找到缓存: 我的结果`);
-      // 更新路径信息
-      myResultsCache.results.forEach(result => {
-        result.paths['原始图片'] = `${basePaths.original}/${result.filename}`;
-        result.paths['GT'] = `${basePaths.gt}/${result.filename}`;
-        result.paths['我的结果'] = `${basePaths.my}/${result.filename}`;
-      });
-      cachedResults.push(...myResultsCache.results);
-      hasCache = true;
-    }
-    
-    // 检查每个对比文件夹的缓存
-    folders.comparison.forEach(compFolder => {
-      const cachedComparison = getCachedSingleComparison(basePaths, compFolder.path);
+  loadFromCacheIncremental: async (folders: FolderData) => {
+    try {
+      const basePaths: BaseFolderPaths = {
+        original: folders.original,
+        gt: folders.gt,
+        my: folders.my
+      };
+
+      console.log('开始检查缓存...');
       
-      if (cachedComparison) {
-        console.log(`找到缓存: ${compFolder.name}`);
-        // 更新缓存结果中的名称映射和路径信息
-        cachedComparison.results.forEach(result => {
-          // 将缓存中的名称更新为当前名称
-          if (result.iou_scores[cachedComparison.comparisonName]) {
-            result.iou_scores[compFolder.name] = result.iou_scores[cachedComparison.comparisonName];
-            result.accuracy_scores[compFolder.name] = result.accuracy_scores[cachedComparison.comparisonName];
-            
-            // 重要：根据当前基础路径更新图片路径
-            // 只更新基础路径和当前对比文件夹路径，不影响其他对比文件夹的路径
-            result.paths['原始图片'] = `${basePaths.original}/${result.filename}`;
-            result.paths['GT'] = `${basePaths.gt}/${result.filename}`;
-            result.paths['我的结果'] = `${basePaths.my}/${result.filename}`;
-            result.paths[compFolder.name] = `${compFolder.path}/${result.filename}`;
-            
-            // 如果名称不同，删除旧的映射
-            if (cachedComparison.comparisonName !== compFolder.name) {
-              delete result.iou_scores[cachedComparison.comparisonName];
-              delete result.accuracy_scores[cachedComparison.comparisonName];
-              delete result.paths[cachedComparison.comparisonName];
+      const cachedResults: ComparisonResult[] = [];
+      const missingComparisons: ComparisonFolder[] = [];
+
+      // 检查"我的结果"缓存
+      const myResultsCache = await getCachedSingleComparison(basePaths, folders.my);
+      let hasMyResults = false;
+      if (myResultsCache) {
+        console.log('找到"我的结果"缓存');
+        cachedResults.push(...myResultsCache.results);
+        hasMyResults = true;
+      } else {
+        console.log('未找到"我的结果"缓存');
+      }
+      
+      // 检查每个对比文件夹的缓存
+      for (const compFolder of folders.comparison) {
+        const comparisonCache = await getCachedSingleComparison(basePaths, compFolder.path);
+        if (comparisonCache) {
+          console.log(`找到对比文件夹"${compFolder.name}"的缓存`);
+          // 合并缓存结果到已有结果中
+          for (const cachedResult of comparisonCache.results) {
+            const existingResult = cachedResults.find(r => r.filename === cachedResult.filename);
+            if (existingResult) {
+              // 合并IOU和准确率分数
+              existingResult.iou_scores = { ...existingResult.iou_scores, ...cachedResult.iou_scores };
+              existingResult.accuracy_scores = { ...existingResult.accuracy_scores, ...cachedResult.accuracy_scores };
+              existingResult.paths = { ...existingResult.paths, ...cachedResult.paths };
+            } else {
+              cachedResults.push(cachedResult);
             }
           }
-        });
-        
-        cachedResults.push(...cachedComparison.results);
-        hasCache = true;
-      } else {
-        console.log(`缺少缓存: ${compFolder.name}`);
-        missingComparisons.push(compFolder);
-      }
-    });
-    
-    // 如果有缓存结果，需要合并相同文件名的结果
-    if (hasCache) {
-      const mergedResults: ComparisonResult[] = [];
-      const fileResultMap = new Map<string, ComparisonResult>();
-      
-      cachedResults.forEach(result => {
-        if (fileResultMap.has(result.filename)) {
-          const existingResult = fileResultMap.get(result.filename)!;
-          // 合并IOU和准确率分数
-          Object.assign(existingResult.iou_scores, result.iou_scores);
-          Object.assign(existingResult.accuracy_scores, result.accuracy_scores);
-          Object.assign(existingResult.paths, result.paths);
         } else {
-          fileResultMap.set(result.filename, { ...result });
+          console.log(`未找到对比文件夹"${compFolder.name}"的缓存`);
+          missingComparisons.push(compFolder);
         }
-      });
-      
-      mergedResults.push(...fileResultMap.values());
-      
-      // 如果所有对比都有缓存，直接设置结果
-      if (missingComparisons.length === 0) {
-        set((state) => {
-          state.comparisonResults = mergedResults;
-          state.currentStep = 'comparison';
-          state.isUsingCache = true;
-          state.error = null;
-        });
-        
-        get().refreshCacheMetadata();
       }
+
+      // 如果没有"我的结果"缓存，添加到需要计算的列表
+      if (!hasMyResults) {
+        missingComparisons.unshift({
+          id: 'my-results',
+          name: '我的结果',
+          path: folders.my
+        });
+      }
+
+      console.log(`缓存检查完成: 找到${cachedResults.length}个缓存结果，需要计算${missingComparisons.length}个对比`);
       
-      return { cachedResults: mergedResults, missingComparisons };
+      return { cachedResults, missingComparisons };
+    } catch (error) {
+      console.error('缓存检查失败:', error);
+      // 如果缓存检查失败，返回所有需要计算的对比
+      const missingComparisons: ComparisonFolder[] = [
+        {
+          id: 'my-results',
+          name: '我的结果',
+          path: folders.my
+        },
+        ...folders.comparison
+      ];
+      return { cachedResults: [], missingComparisons };
     }
-    
-    return { cachedResults: [], missingComparisons: folders.comparison };
   },
   
-  saveToCache: (basePaths: BaseFolderPaths, comparisonFolders: ComparisonFolder[], results: ComparisonResult[]) => {
-    // 为每个对比文件夹单独保存缓存
-    comparisonFolders.forEach(compFolder => {
-      // 提取这个对比文件夹的结果
-      const folderResults = results.map(result => ({
+  saveToCache: async (basePaths: BaseFolderPaths, comparisonFolders: ComparisonFolder[], results: ComparisonResult[]) => {
+    try {
+      // 为每个对比文件夹单独保存缓存
+      for (const compFolder of comparisonFolders) {
+        // 提取这个对比文件夹的结果
+        const folderResults = results.map(result => ({
+          ...result,
+          iou_scores: { [compFolder.name]: result.iou_scores[compFolder.name] },
+          accuracy_scores: { [compFolder.name]: result.accuracy_scores[compFolder.name] },
+          paths: { 
+            '原始图片': result.paths['原始图片'],
+            'GT': result.paths['GT'],
+            '我的结果': result.paths['我的结果'],
+            [compFolder.name]: result.paths[compFolder.name]
+          }
+        })).filter(result => 
+          result.iou_scores[compFolder.name] !== undefined || 
+          result.accuracy_scores[compFolder.name] !== undefined
+        );
+        
+        if (folderResults.length > 0) {
+          const cacheResult = createSingleComparisonCache(
+            basePaths,
+            compFolder.name,
+            compFolder.path,
+            folderResults
+          );
+          await saveSingleComparisonCache(cacheResult);
+          console.log(`已保存缓存: ${compFolder.name}`);
+        }
+      }
+      
+      // 同时为"我的结果"创建缓存记录
+      const myResultsData = results.map(result => ({
         ...result,
-        iou_scores: { [compFolder.name]: result.iou_scores[compFolder.name] },
-        accuracy_scores: { [compFolder.name]: result.accuracy_scores[compFolder.name] },
+        iou_scores: { '我的结果': result.iou_scores['我的结果'] },
+        accuracy_scores: { '我的结果': result.accuracy_scores['我的结果'] },
         paths: { 
           '原始图片': result.paths['原始图片'],
           'GT': result.paths['GT'],
-          '我的结果': result.paths['我的结果'],
-          [compFolder.name]: result.paths[compFolder.name]
+          '我的结果': result.paths['我的结果']
         }
       })).filter(result => 
-        result.iou_scores[compFolder.name] !== undefined || 
-        result.accuracy_scores[compFolder.name] !== undefined
+        result.iou_scores['我的结果'] !== undefined || 
+        result.accuracy_scores['我的结果'] !== undefined
       );
       
-      if (folderResults.length > 0) {
-        const cacheResult = createSingleComparisonCache(
+      if (myResultsData.length > 0) {
+        const myResultsCacheResult = createSingleComparisonCache(
           basePaths,
-          compFolder.name,
-          compFolder.path,
-          folderResults
+          '我的结果',
+          basePaths.my,
+          myResultsData
         );
-        saveSingleComparisonCache(cacheResult);
-        console.log(`已保存缓存: ${compFolder.name}`);
+        await saveSingleComparisonCache(myResultsCacheResult);
+        console.log(`已保存缓存: 我的结果`);
       }
-    });
-    
-    // 同时为"我的结果"创建缓存记录
-    const myResultsData = results.map(result => ({
-      ...result,
-      iou_scores: { '我的结果': result.iou_scores['我的结果'] },
-      accuracy_scores: { '我的结果': result.accuracy_scores['我的结果'] },
-      paths: { 
-        '原始图片': result.paths['原始图片'],
-        'GT': result.paths['GT'],
-        '我的结果': result.paths['我的结果']
-      }
-    })).filter(result => 
-      result.iou_scores['我的结果'] !== undefined || 
-      result.accuracy_scores['我的结果'] !== undefined
-    );
-    
-    if (myResultsData.length > 0) {
-      const myResultsCacheResult = createSingleComparisonCache(
-        basePaths,
-        '我的结果',
-        basePaths.my,
-        myResultsData
-      );
-      saveSingleComparisonCache(myResultsCacheResult);
-      console.log(`已保存缓存: 我的结果`);
+      
+      // 刷新缓存元数据
+      await get().refreshCacheMetadata();
+    } catch (error) {
+      console.error('保存缓存失败:', error);
     }
-    
-    // 刷新缓存元数据
-    get().refreshCacheMetadata();
   },
   
-  clearCache: () => {
-    clearAllCache();
-    set((state) => {
-      state.cacheMetadata = getCacheMetadata();
-      state.isUsingCache = false;
-    });
+  clearCache: async () => {
+    try {
+      await clearAllCache();
+      const metadata = await getCacheMetadata();
+      set((state) => {
+        state.cacheMetadata = metadata;
+        state.isUsingCache = false;
+      });
+    } catch (error) {
+      console.error('清空缓存失败:', error);
+    }
   },
   
-  cleanupCache: (maxAge: number = 30): number => {
-    const deletedCount = cleanupExpiredCache(maxAge);
-    
-    // 刷新缓存元数据
-    get().refreshCacheMetadata();
-    
-    return deletedCount;
+  cleanupCache: async (maxAge: number = 30): Promise<number> => {
+    try {
+      const deletedCount = await cleanupExpiredCache(maxAge);
+      
+      // 刷新缓存元数据
+      await get().refreshCacheMetadata();
+      
+      return deletedCount;
+    } catch (error) {
+      console.error('清理缓存失败:', error);
+      return 0;
+    }
   },
   
-  refreshCacheMetadata: () => {
-    set((state) => {
-      state.cacheMetadata = getCacheMetadata();
-    });
+  refreshCacheMetadata: async () => {
+    try {
+      const metadata = await getCacheMetadata();
+      set((state) => {
+        state.cacheMetadata = metadata;
+      });
+    } catch (error) {
+      console.error('刷新缓存元数据失败:', error);
+    }
+  },
+
+  getAllCacheDetails: async () => {
+    try {
+      return await getAllCacheDetails();
+    } catch (error) {
+      console.error('获取缓存详情失败:', error);
+      return [];
+    }
   }
 }); 

@@ -1,6 +1,5 @@
 import { 
   AppState, 
-  Step, 
   FolderData, 
   ValidationResult, 
   ComparisonResult, 
@@ -8,12 +7,12 @@ import {
   CacheMetadata,
   BaseFolderPaths,
   ComparisonFolder,
-  ProgressInfo
+  ProgressInfo,
+  CachedSingleComparison
 } from '../types';
 
 // Store接口定义
 export interface FolderActions {
-  setCurrentStep: (step: Step) => void;
   setFolders: (folders: FolderData) => void;
   setValidationResult: (result: ValidationResult | null) => void;
   setComparisonResults: (results: ComparisonResult[]) => void;
@@ -40,22 +39,22 @@ export interface HistoryActions {
 export interface CacheActions {
   setCacheMetadata: (metadata: CacheMetadata | null) => void;
   setIsUsingCache: (isUsingCache: boolean) => void;
-  loadFromCacheIncremental: (folders: FolderData) => { 
+  loadFromCacheIncremental: (folders: FolderData) => Promise<{ 
     cachedResults: ComparisonResult[], 
     missingComparisons: ComparisonFolder[] 
-  };
-  saveToCache: (basePaths: BaseFolderPaths, comparisonFolders: ComparisonFolder[], results: ComparisonResult[]) => void;
-  clearCache: () => void;
-  cleanupCache: (maxAge?: number) => number;
-  refreshCacheMetadata: () => void;
+  }>;
+  saveToCache: (basePaths: BaseFolderPaths, comparisonFolders: ComparisonFolder[], results: ComparisonResult[]) => Promise<void>;
+  clearCache: () => Promise<void>;
+  cleanupCache: (maxAge?: number) => Promise<number>;
+  refreshCacheMetadata: () => Promise<void>;
+  getAllCacheDetails: () => Promise<CachedSingleComparison[]>;
 }
 
 export interface AppStore extends AppState, FolderActions, ProgressActions, HistoryActions, CacheActions {
-  initialize: () => void;
+  initialize: () => Promise<void>;
 }
 
 export const initialState: AppState = {
-  currentStep: 'folder-selection',
   folders: {
     original: '',
     gt: '',
