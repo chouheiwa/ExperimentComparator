@@ -123,5 +123,24 @@ export const createHistoryActions: StateCreator<
       // 重置缓存状态
       state.isUsingCache = false;
     });
+  },
+
+  importHistoryRecords: (records: HistoryRecord[]) => {
+    const currentRecords = get().historyRecords;
+    
+    // 过滤掉已存在的记录（基于ID），保留新的记录
+    const newRecords = records.filter(record => 
+      !currentRecords.find(existing => existing.id === record.id)
+    );
+    
+    if (newRecords.length > 0) {
+      set((state) => {
+        // 将新记录添加到现有记录的开头
+        state.historyRecords = [...newRecords, ...state.historyRecords];
+      });
+      
+      const allRecords = get().historyRecords;
+      saveHistoryToStorage(allRecords);
+    }
   }
 }); 

@@ -31,6 +31,7 @@ export const useDeleteHistoryRecord = () => useAppStore((state) => state.deleteH
 export const useUpdateHistoryRecord = () => useAppStore((state) => state.updateHistoryRecord);
 export const useSetCurrentHistoryRecordId = () => useAppStore((state) => state.setCurrentHistoryRecordId);
 export const useLoadHistoryRecord = () => useAppStore((state) => state.loadHistoryRecord);
+export const useImportHistoryRecords = () => useAppStore((state) => state.importHistoryRecords);
 
 // 缓存相关动作选择器
 export const useSetCacheMetadata = () => useAppStore((state) => state.setCacheMetadata);

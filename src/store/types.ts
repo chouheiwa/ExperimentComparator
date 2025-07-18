@@ -34,6 +34,7 @@ export interface HistoryActions {
   updateHistoryRecord: (id: string, name: string, description?: string) => void;
   setCurrentHistoryRecordId: (id: string | null) => void;
   loadHistoryRecord: (record: HistoryRecord) => void;
+  importHistoryRecords: (records: HistoryRecord[]) => void;
 }
 
 export interface CacheActions {

@@ -14,6 +14,7 @@ import {
   useDeleteHistoryRecord,
   useUpdateHistoryRecord,
   useLoadHistoryRecord,
+  useImportHistoryRecords,
   useClearCache,
   useCleanupCache,
   useRefreshCacheMetadata,
@@ -41,6 +42,7 @@ const MainLayout: React.FC = () => {
   const deleteHistoryRecord = useDeleteHistoryRecord();
   const updateHistoryRecord = useUpdateHistoryRecord();
   const loadHistoryRecord = useLoadHistoryRecord();
+  const importHistoryRecords = useImportHistoryRecords();
   const clearCache = useClearCache();
   const cleanupCache = useCleanupCache();
   const refreshCacheMetadata = useRefreshCacheMetadata();
@@ -172,6 +174,7 @@ const MainLayout: React.FC = () => {
                   onLoadRecord={loadHistoryRecord}
                   onDeleteRecord={deleteHistoryRecord}
                   onUpdateRecord={updateHistoryRecord}
+                  onImportRecords={importHistoryRecords}
                   onClearCache={clearCache}
                   onCleanupCache={cleanupCache}
                   cacheMetadata={cacheMetadata}
