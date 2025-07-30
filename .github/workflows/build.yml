@@ -54,7 +54,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
-          cache: 'npm'
+          cache: ${{ matrix.platform != 'windows-latest' && 'npm' || '' }}
 
       - name: Install frontend dependencies
         run: |
