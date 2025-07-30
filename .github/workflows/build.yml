@@ -57,7 +57,7 @@ jobs:
           cache: 'npm'
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
 
       - name: Set default release title
         if: ${{ github.event.inputs.create_release == 'true' }}
