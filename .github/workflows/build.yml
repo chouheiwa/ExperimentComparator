@@ -57,11 +57,11 @@ jobs:
           cache: ${{ matrix.platform != 'windows-latest' && 'npm' || '' }}
 
       - name: Install frontend dependencies
-        run: |
-          npm install
-          if [ "${{ matrix.platform }}" = "windows-latest" ]; then
-            npm install @tauri-apps/cli-win32-x64-msvc@2.7.1
-          fi
+        run: npm install
+
+      - name: Install Windows-specific Tauri CLI
+        if: matrix.platform == 'windows-latest'
+        run: npm install @tauri-apps/cli-win32-x64-msvc@2.7.1
 
       - name: Set default release title
         if: ${{ github.event.inputs.create_release == 'true' }}
