@@ -2,10 +2,10 @@ import {
   readTextFile, 
   writeTextFile, 
   exists, 
-  createDir, 
+  mkdir, 
   readDir,
-  removeFile
-} from '@tauri-apps/api/fs';
+  remove
+} from '@tauri-apps/plugin-fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
 import { 
   CachedSingleComparison, 
@@ -28,7 +28,7 @@ export const ensureCacheDir = async (): Promise<void> => {
   const cacheDir = await getCacheDir();
   const dirExists = await exists(cacheDir);
   if (!dirExists) {
-    await createDir(cacheDir, { recursive: true });
+    await mkdir(cacheDir, { recursive: true });
   }
 };
 
@@ -237,7 +237,7 @@ export const deleteSingleComparisonCache = async (cacheKey: string): Promise<voi
     const fileExists = await exists(cacheFilePath);
     
     if (fileExists) {
-      await removeFile(cacheFilePath);
+      await remove(cacheFilePath);
       await updateCacheMetadata();
     }
   } catch (error) {
@@ -258,7 +258,7 @@ export const clearAllCache = async (): Promise<void> => {
       if (entry.name && entry.name.endsWith('.json')) {
         try {
           const filePath = await join(cacheDir, entry.name);
-          await removeFile(filePath);
+          await remove(filePath);
         } catch (error) {
           console.error(`删除缓存文件失败: ${entry.name}`, error);
         }
@@ -369,7 +369,7 @@ export const cleanupExpiredCache = async (maxAge: number = 30): Promise<number> 
           
           const lastAccessed = new Date(cacheItem.lastAccessedAt);
           if (lastAccessed < cutoffDate) {
-            await removeFile(filePath);
+            await remove(filePath);
             deletedCount++;
           }
         } catch (error) {

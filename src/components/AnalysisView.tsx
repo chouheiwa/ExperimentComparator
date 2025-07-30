@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Card, Button, Select, Switch, Row, Col, Typography, Tag, Space, Modal, message } from 'antd';
 import { DownloadOutlined, StarOutlined, StarFilled } from '@ant-design/icons';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { ComparisonResult } from '../types';
 import ImageComparisonGrid from './ImageComparisonGrid';
 import SafeImage from './SafeImage';

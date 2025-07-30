@@ -1,10 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::collections::HashMap;
-use std::path::Path;
-use std::fs;
-use serde::{Deserialize, Serialize};
 use image::GenericImageView;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
+use tauri::Emitter;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct FolderInfo {
@@ -28,7 +29,7 @@ struct ValidationResult {
     missing_files: HashMap<String, Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct ProgressEvent {
     current: usize,
     total: usize,
@@ -45,7 +46,7 @@ fn get_image_files(dir_path: &str) -> Result<Vec<String>, String> {
 
     let mut files = Vec::new();
     let valid_extensions = vec!["jpg", "jpeg", "png", "bmp", "tiff", "webp"];
-    
+
     if let Ok(entries) = fs::read_dir(path) {
         for entry in entries {
             if let Ok(entry) = entry {
@@ -66,7 +67,7 @@ fn get_image_files(dir_path: &str) -> Result<Vec<String>, String> {
             }
         }
     }
-    
+
     files.sort();
     Ok(files)
 }
@@ -75,27 +76,30 @@ fn get_image_files(dir_path: &str) -> Result<Vec<String>, String> {
 fn calculate_iou(img1_path: &str, img2_path: &str) -> Result<f64, String> {
     let img1 = image::open(img1_path).map_err(|e| format!("无法打开图片1: {}", e))?;
     let img2 = image::open(img2_path).map_err(|e| format!("无法打开图片2: {}", e))?;
-    
+
     // 这里简化IOU计算，实际应用中需要根据您的具体需求进行调整
     // 假设图片是分割掩码，计算像素级IOU
     let (width1, height1) = img1.dimensions();
     let (width2, height2) = img2.dimensions();
-    
+
     if width1 != width2 || height1 != height2 {
-        return Err(format!("图片尺寸: {}x{} 对 {}x{} 不匹配: {} vs {}", width1, height1, width2, height2, img1_path, img2_path));
+        return Err(format!(
+            "图片尺寸: {}x{} 对 {}x{} 不匹配: {} vs {}",
+            width1, height1, width2, height2, img1_path, img2_path
+        ));
     }
-    
+
     let img1_gray = img1.to_luma8();
     let img2_gray = img2.to_luma8();
-    
+
     let mut intersection = 0u32;
     let mut union = 0u32;
-    
+
     for y in 0..height1 {
         for x in 0..width1 {
             let pixel1 = img1_gray.get_pixel(x, y)[0] > 128;
             let pixel2 = img2_gray.get_pixel(x, y)[0] > 128;
-            
+
             if pixel1 && pixel2 {
                 intersection += 1;
             }
@@ -104,7 +108,7 @@ fn calculate_iou(img1_path: &str, img2_path: &str) -> Result<f64, String> {
             }
         }
     }
-    
+
     if union == 0 {
         Ok(1.0) // 如果两个图片都是空的，IOU为1
     } else {
@@ -116,43 +120,40 @@ fn calculate_iou(img1_path: &str, img2_path: &str) -> Result<f64, String> {
 fn calculate_accuracy(img1_path: &str, img2_path: &str) -> Result<f64, String> {
     let img1 = image::open(img1_path).map_err(|e| format!("无法打开图片1: {}", e))?;
     let img2 = image::open(img2_path).map_err(|e| format!("无法打开图片2: {}", e))?;
-    
+
     let (width1, height1) = img1.dimensions();
     let (width2, height2) = img2.dimensions();
-    
+
     if width1 != width2 || height1 != height2 {
         return Err("图片尺寸不匹配".to_string());
     }
-    
+
     let img1_gray = img1.to_luma8();
     let img2_gray = img2.to_luma8();
-    
+
     let mut correct_pixels = 0u32;
     let total_pixels = (width1 * height1) as u32;
-    
+
     for y in 0..height1 {
         for x in 0..width1 {
             let pixel1 = img1_gray.get_pixel(x, y)[0] > 128;
             let pixel2 = img2_gray.get_pixel(x, y)[0] > 128;
-            
+
             // 如果两个像素的分类相同（都是前景或都是背景），则为正确
             if pixel1 == pixel2 {
                 correct_pixels += 1;
             }
         }
     }
-    
+
     Ok(correct_pixels as f64 / total_pixels as f64)
 }
 
 #[tauri::command]
 async fn select_folder() -> Result<String, String> {
-    use tauri::api::dialog::blocking::FileDialogBuilder;
-    
-    match FileDialogBuilder::new().pick_folder() {
-        Some(path) => Ok(path.to_string_lossy().to_string()),
-        None => Err("未选择文件夹".to_string()),
-    }
+    // 在 Tauri 2.0 中，对话框功能需要通过前端调用
+    // 这里返回一个占位符，实际实现需要在前端处理
+    Err("请在前端实现文件夹选择功能".to_string())
 }
 
 #[tauri::command]
@@ -171,39 +172,41 @@ async fn validate_folders(folders: Vec<String>) -> Result<ValidationResult, Stri
     if folders.len() < 3 {
         return Err("至少需要选择3个文件夹".to_string());
     }
-    
+
     let mut folder_files = Vec::new();
-    
+
     // 获取每个文件夹的文件列表
     for folder in &folders {
         let files = get_image_files(folder)?;
         folder_files.push(files);
     }
-    
+
     // 找出所有文件夹共有的文件
     let mut common_files = folder_files[0].clone();
     for files in &folder_files[1..] {
         common_files.retain(|f| files.contains(f));
     }
-    
+
     // 检查缺失的文件
     let mut missing_files = HashMap::new();
     for (i, folder) in folders.iter().enumerate() {
-        let folder_name = Path::new(folder).file_name()
+        let folder_name = Path::new(folder)
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("未知")
             .to_string();
-        
-        let missing: Vec<String> = common_files.iter()
+
+        let missing: Vec<String> = common_files
+            .iter()
             .filter(|f| !folder_files[i].contains(f))
             .cloned()
             .collect();
-        
+
         if !missing.is_empty() {
             missing_files.insert(folder_name, missing);
         }
     }
-    
+
     Ok(ValidationResult {
         is_valid: missing_files.is_empty() && !common_files.is_empty(),
         common_files,
@@ -228,7 +231,7 @@ async fn calculate_comparisons_with_progress(
 ) -> Result<Vec<ComparisonResult>, String> {
     let mut results = Vec::new();
     let total_files = common_files.len();
-    
+
     for (index, filename) in common_files.iter().enumerate() {
         // 发送进度事件
         let progress = ProgressEvent {
@@ -237,24 +240,24 @@ async fn calculate_comparisons_with_progress(
             percentage: (index as f64 / total_files as f64) * 100.0,
             current_file: filename.clone(),
         };
-        
-        if let Err(e) = window.emit("progress_update", &progress) {
+
+        if let Err(e) = window.emit("progress_update", progress) {
             eprintln!("发送进度事件失败: {}", e);
         }
-        
+
         let original_path = format!("{}/{}", original_folder, filename);
         let gt_path = format!("{}/{}", gt_folder, filename);
         let my_path = format!("{}/{}", my_folder, filename);
-        
+
         let mut iou_scores = HashMap::new();
         let mut accuracy_scores = HashMap::new();
         let mut paths = HashMap::new();
-        
+
         // 添加原始图片、GT和我的实验数据路径
         paths.insert("原始图片".to_string(), original_path.clone());
         paths.insert("GT".to_string(), gt_path.clone());
         paths.insert("我的结果".to_string(), my_path.clone());
-        
+
         // 计算我的结果与GT的IOU和准确率
         match calculate_iou(&gt_path, &my_path) {
             Ok(iou) => {
@@ -265,7 +268,7 @@ async fn calculate_comparisons_with_progress(
                 iou_scores.insert("我的结果".to_string(), 0.0);
             }
         }
-        
+
         match calculate_accuracy(&gt_path, &my_path) {
             Ok(accuracy) => {
                 accuracy_scores.insert("我的结果".to_string(), accuracy);
@@ -275,14 +278,14 @@ async fn calculate_comparisons_with_progress(
                 accuracy_scores.insert("我的结果".to_string(), 0.0);
             }
         }
-        
+
         // 计算对比数据与GT的IOU和准确率
         for comp_folder in comparison_folders.iter() {
             let comp_path = format!("{}/{}", comp_folder.path, filename);
             let comp_name = comp_folder.name.clone();
-            
+
             paths.insert(comp_name.clone(), comp_path.clone());
-            
+
             // 计算IOU
             match calculate_iou(&gt_path, &comp_path) {
                 Ok(iou) => {
@@ -293,7 +296,7 @@ async fn calculate_comparisons_with_progress(
                     iou_scores.insert(comp_name.clone(), 0.0);
                 }
             }
-            
+
             // 计算准确率
             match calculate_accuracy(&gt_path, &comp_path) {
                 Ok(accuracy) => {
@@ -305,7 +308,7 @@ async fn calculate_comparisons_with_progress(
                 }
             }
         }
-        
+
         results.push(ComparisonResult {
             filename: filename.clone(),
             iou_scores,
@@ -313,7 +316,7 @@ async fn calculate_comparisons_with_progress(
             paths,
         });
     }
-    
+
     // 发送完成事件
     let final_progress = ProgressEvent {
         current: total_files,
@@ -321,11 +324,11 @@ async fn calculate_comparisons_with_progress(
         percentage: 100.0,
         current_file: "计算完成".to_string(),
     };
-    
-    if let Err(e) = window.emit("progress_update", &final_progress) {
+
+    if let Err(e) = window.emit("progress_update", final_progress) {
         eprintln!("发送完成事件失败: {}", e);
     }
-    
+
     Ok(results)
 }
 
@@ -338,21 +341,21 @@ async fn calculate_comparisons(
     common_files: Vec<String>,
 ) -> Result<Vec<ComparisonResult>, String> {
     let mut results = Vec::new();
-    
+
     for filename in common_files {
         let original_path = format!("{}/{}", original_folder, filename);
         let gt_path = format!("{}/{}", gt_folder, filename);
         let my_path = format!("{}/{}", my_folder, filename);
-        
+
         let mut iou_scores = HashMap::new();
         let mut accuracy_scores = HashMap::new();
         let mut paths = HashMap::new();
-        
+
         // 添加原始图片、GT和我的实验数据路径
         paths.insert("原始图片".to_string(), original_path.clone());
         paths.insert("GT".to_string(), gt_path.clone());
         paths.insert("我的结果".to_string(), my_path.clone());
-        
+
         // 计算我的结果与GT的IOU和准确率
         match calculate_iou(&gt_path, &my_path) {
             Ok(iou) => {
@@ -363,7 +366,7 @@ async fn calculate_comparisons(
                 iou_scores.insert("我的结果".to_string(), 0.0);
             }
         }
-        
+
         match calculate_accuracy(&gt_path, &my_path) {
             Ok(accuracy) => {
                 accuracy_scores.insert("我的结果".to_string(), accuracy);
@@ -373,14 +376,14 @@ async fn calculate_comparisons(
                 accuracy_scores.insert("我的结果".to_string(), 0.0);
             }
         }
-        
+
         // 计算对比数据与GT的IOU和准确率
         for comp_folder in comparison_folders.iter() {
             let comp_path = format!("{}/{}", comp_folder.path, filename);
             let comp_name = comp_folder.name.clone();
-            
+
             paths.insert(comp_name.clone(), comp_path.clone());
-            
+
             // 计算IOU
             match calculate_iou(&gt_path, &comp_path) {
                 Ok(iou) => {
@@ -391,7 +394,7 @@ async fn calculate_comparisons(
                     iou_scores.insert(comp_name.clone(), 0.0);
                 }
             }
-            
+
             // 计算准确率
             match calculate_accuracy(&gt_path, &comp_path) {
                 Ok(accuracy) => {
@@ -403,7 +406,7 @@ async fn calculate_comparisons(
                 }
             }
         }
-        
+
         results.push(ComparisonResult {
             filename,
             iou_scores,
@@ -411,21 +414,15 @@ async fn calculate_comparisons(
             paths,
         });
     }
-    
+
     Ok(results)
 }
 
 #[tauri::command]
 async fn select_export_folder() -> Result<String, String> {
-    use tauri::api::dialog::blocking::FileDialogBuilder;
-    
-    match FileDialogBuilder::new()
-        .set_title("选择导出文件夹")
-        .pick_folder() 
-    {
-        Some(path) => Ok(path.to_string_lossy().to_string()),
-        None => Err("未选择导出文件夹".to_string()),
-    }
+    // 在 Tauri 2.0 中，对话框功能需要通过前端调用
+    // 这里返回一个占位符，实际实现需要在前端处理
+    Err("请在前端实现导出文件夹选择功能".to_string())
 }
 
 #[derive(Debug, Deserialize)]
@@ -442,18 +439,18 @@ struct ExportImageInfo {
 
 #[tauri::command]
 async fn export_selected_images(request: ExportImageRequest) -> Result<String, String> {
-    use std::path::Path;
     use std::fs;
-    
+    use std::path::Path;
+
     let export_path = Path::new(&request.export_folder);
     if !export_path.exists() {
         return Err("导出文件夹不存在".to_string());
     }
-    
+
     let mut success_count = 0;
     let mut error_files = Vec::new();
     let total_files = request.image_files.len();
-    
+
     for image_info in &request.image_files {
         // 为每个图片创建子文件夹
         let image_folder = export_path.join(&image_info.filename.replace(".", "_"));
@@ -461,7 +458,7 @@ async fn export_selected_images(request: ExportImageRequest) -> Result<String, S
             error_files.push(format!("创建文件夹失败 {}: {}", image_info.filename, e));
             continue;
         }
-        
+
         // 复制所有版本的图片到对应子文件夹
         for (model_name, source_path) in &image_info.model_paths {
             let source = Path::new(source_path);
@@ -469,27 +466,41 @@ async fn export_selected_images(request: ExportImageRequest) -> Result<String, S
                 error_files.push(format!("源文件不存在: {}", source_path));
                 continue;
             }
-            
+
             // 使用模型名称作为前缀，去除特殊字符
-            let safe_model_name = model_name.replace("/", "_").replace("\\", "_").replace(":", "_");
+            let safe_model_name = model_name
+                .replace("/", "_")
+                .replace("\\", "_")
+                .replace(":", "_");
             let dest_filename = format!("{}_{}", safe_model_name, image_info.filename);
             let dest_path = image_folder.join(dest_filename);
-            
+
             if let Err(e) = fs::copy(source, &dest_path) {
-                error_files.push(format!("复制文件失败 {} -> {}: {}", 
-                    source_path, dest_path.display(), e));
+                error_files.push(format!(
+                    "复制文件失败 {} -> {}: {}",
+                    source_path,
+                    dest_path.display(),
+                    e
+                ));
                 continue;
             }
         }
-        
+
         success_count += 1;
     }
-    
+
     if error_files.is_empty() {
-        Ok(format!("成功导出 {} 个图片到 {}", success_count, request.export_folder))
+        Ok(format!(
+            "成功导出 {} 个图片到 {}",
+            success_count, request.export_folder
+        ))
     } else {
-        let error_msg = format!("部分导出成功 ({}/{}): {}", 
-            success_count, total_files, error_files.join("; "));
+        let error_msg = format!(
+            "部分导出成功 ({}/{}): {}",
+            success_count,
+            total_files,
+            error_files.join("; ")
+        );
         if success_count == 0 {
             Err(error_msg)
         } else {
@@ -500,6 +511,8 @@ async fn export_selected_images(request: ExportImageRequest) -> Result<String, S
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             select_folder,
             is_file,
@@ -512,4 +525,4 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-} 
+}

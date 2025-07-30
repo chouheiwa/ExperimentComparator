@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Typography, Button, Space, Card } from 'antd';
 import { InboxOutlined, FolderOutlined, FolderOpenOutlined } from '@ant-design/icons';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 
 const { Text, Title } = Typography;
 

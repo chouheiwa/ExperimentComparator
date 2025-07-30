@@ -16,8 +16,8 @@ import {
   Collapse,
   Tag
 } from 'antd';
-import { save, open } from '@tauri-apps/api/dialog';
-import { writeTextFile, readTextFile } from '@tauri-apps/api/fs';
+import { save, open } from '@tauri-apps/plugin-dialog';
+import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { 
   HistoryOutlined, 
   DeleteOutlined, 

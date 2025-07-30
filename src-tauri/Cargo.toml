@@ -8,16 +8,17 @@ repository = "https://github.com/chouheiwa/ExperimentComparator"
 edition = "2021"
 
 [build-dependencies]
-tauri-build = { version = "1.5.0", features = [] }
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "1.5.0", features = [ "protocol-asset", "fs-exists", "window-unminimize", "dialog-save", "fs-write-file", "window-show", "shell-open", "window-unmaximize", "fs-create-dir", "window-hide", "window-close", "fs-remove-file", "fs-rename-file", "fs-read-dir", "fs-copy-file", "fs-read-file", "window-start-dragging", "window-minimize", "path-all", "fs-remove-dir", "dialog-open", "window-maximize"] }
+tauri = { version = "2", features = ["protocol-asset"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 image = "0.24"
 imageproc = "0.23"
 tokio = { version = "1.0", features = ["full"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
 
 [features]
-default = ["custom-protocol"]
-custom-protocol = ["tauri/custom-protocol"]
+default = []

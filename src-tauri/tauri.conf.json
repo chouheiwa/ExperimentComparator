@@ -2,110 +2,21 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist",
-    "withGlobalTauri": false
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
   },
-  "package": {
-    "productName": "ExperimentComparator",
-    "version": "1.0.3"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "shell": {
-        "all": false,
-        "open": true
-      },
-      "dialog": {
-        "all": false,
-        "open": true,
-        "save": true
-      },
-      "fs": {
-        "all": false,
-        "readFile": true,
-        "writeFile": true,
-        "readDir": true,
-        "copyFile": true,
-        "createDir": true,
-        "removeDir": true,
-        "removeFile": true,
-        "renameFile": true,
-        "exists": true,
-        "scope": [
-          "$APPDATA",
-          "$APPDATA/**",
-          "$APPLOCAL",
-          "$APPLOCAL/**",
-          "$APPCONFIG",
-          "$APPCONFIG/**"
-        ]
-      },
-      "path": {
-        "all": true
-      },
-      "protocol": {
-        "all": false,
-        "asset": true,
-        "assetScope": ["**"]
-      },
-      "window": {
-        "all": false,
-        "close": true,
-        "hide": true,
-        "show": true,
-        "maximize": true,
-        "minimize": true,
-        "unmaximize": true,
-        "unminimize": true,
-        "startDragging": true
-      }
-    },
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "com.chouheiwa.experimentcomparator",
-      "icon": [
-        "icons/16x16.png",
-        "icons/32x32.png",
-        "icons/48x48.png",
-        "icons/64x64.png",
-        "icons/128x128.png",
-        "icons/256x256.png",
-        "icons/512x512.png",
-        "icons/1024x1024.png",
-        "icons/icon.ico",
-        "icons/icon.icns"
-      ],
-      "resources": [],
-      "externalBin": [],
-      "copyright": "",
-      "category": "DeveloperTool",
-      "shortDescription": "Model experiment results comparison tool",
-      "longDescription": "A modern desktop application for comparing machine learning model experiment results with IOU and accuracy metrics.",
-      "appimage": {
-        "bundleMediaFramework": true
-      },
-      "deb": {
-        "depends": []
-      },
-      "macOS": {
-        "frameworks": [],
-        "minimumSystemVersion": "10.13",
-        "exceptionDomain": "",
-        "signingIdentity": null,
-        "providerShortName": null,
-        "entitlements": null
-      },
-      "windows": {
-        "certificateThumbprint": null,
-        "digestAlgorithm": "sha256",
-        "timestampUrl": ""
-      }
-    },
+  "productName": "ExperimentComparator",
+  "version": "1.0.3",
+  "mainBinaryName": "ExperimentComparator",
+  "identifier": "com.chouheiwa.experimentcomparator",
+  "app": {
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost;",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**/*"]
+      },
+      "capabilities": ["main-capability"]
     },
     "windows": [
       {
@@ -116,8 +27,65 @@
         "height": 800,
         "minWidth": 800,
         "minHeight": 600,
-        "fileDropEnabled": true
+        "dragDropEnabled": true
       }
-    ]
+    ],
+    "trayIcon": null
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/16x16.png",
+      "icons/32x32.png",
+      "icons/48x48.png",
+      "icons/64x64.png",
+      "icons/128x128.png",
+      "icons/256x256.png",
+      "icons/512x512.png",
+      "icons/1024x1024.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
+    ],
+    "resources": [],
+    "externalBin": [],
+    "copyright": "",
+    "category": "DeveloperTool",
+    "shortDescription": "Model experiment results comparison tool",
+    "longDescription": "A modern desktop application for comparing machine learning model experiment results with IOU and accuracy metrics.",
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      },
+      "deb": {
+        "depends": []
+      }
+    },
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "providerShortName": null,
+      "entitlements": null,
+      "dmg": {}
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
+  },
+  "plugins": {
+    "window": {
+      "close": true,
+      "hide": true,
+      "show": true,
+      "maximize": true,
+      "minimize": true,
+      "unmaximize": true,
+      "unminimize": true,
+      "startDragging": true
+    }
   }
 }
