@@ -54,10 +54,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
-          cache: ''
+          cache: 'npm'
 
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
 
       - name: Install Windows-specific Tauri CLI
         if: matrix.platform == 'windows-latest'
