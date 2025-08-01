@@ -14,4 +14,6 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  // Ensure proper base path for Tauri builds
+  base: "./",
 })) 

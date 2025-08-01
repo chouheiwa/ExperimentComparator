@@ -6,17 +6,21 @@
     "frontendDist": "../dist"
   },
   "productName": "ExperimentComparator",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "mainBinaryName": "ExperimentComparator",
   "identifier": "com.chouheiwa.experimentcomparator",
   "app": {
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost;",
+      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:;",
       "assetProtocol": {
         "enable": true,
-        "scope": ["**/*"]
+        "scope": [
+          "**/*"
+        ]
       },
-      "capabilities": ["main-capability"]
+      "capabilities": [
+        "main-capability"
+      ]
     },
     "windows": [
       {

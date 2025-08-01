@@ -1,6 +1,6 @@
 {
   "name": "experiment-comparator",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "A modern desktop application for comparing machine learning model experiment results",
   "type": "module",
   "scripts": {
@@ -16,7 +16,7 @@
     "build:mac": "tauri build --target universal-apple-darwin",
     "build:linux": "tauri build --target x86_64-unknown-linux-gnu",
     "version:patch": "node scripts/update-version.js patch",
-    "version:minor": "node scripts/update-version.js minor", 
+    "version:minor": "node scripts/update-version.js minor",
     "version:major": "node scripts/update-version.js major",
     "update:deps": "npm update && cd src-tauri && cargo update",
     "package": "npm run build && npm run tauri:build",
