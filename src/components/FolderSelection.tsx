@@ -312,20 +312,20 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
     let unlistenDragLeave: (() => void) | undefined;
 
     const setupListeners = async () => {
-      // 监听拖放事件
-      unlistenDrop = await listen('tauri://file-drop', (event) => {
+      // 监听拖放事件 - Tauri 2.0 中的正确事件名称
+      unlistenDrop = await listen('tauri://drag-drop', (event) => {
         setIsDragging(false);
         const paths = event.payload as string[];
         handleFolderDrop(paths);
       });
 
       // 监听拖拽悬停事件
-      unlistenDragOver = await listen('tauri://file-drop-hover', () => {
+      unlistenDragOver = await listen('tauri://drag-over', () => {
         setIsDragging(true);
       });
 
       // 监听拖拽离开事件
-      unlistenDragLeave = await listen('tauri://file-drop-cancelled', () => {
+      unlistenDragLeave = await listen('tauri://drag-leave', () => {
         setIsDragging(false);
       });
     };

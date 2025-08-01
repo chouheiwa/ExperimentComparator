@@ -150,10 +150,32 @@ fn calculate_accuracy(img1_path: &str, img2_path: &str) -> Result<f64, String> {
 }
 
 #[tauri::command]
-async fn select_folder() -> Result<String, String> {
-    // 在 Tauri 2.0 中，对话框功能需要通过前端调用
-    // 这里返回一个占位符，实际实现需要在前端处理
-    Err("请在前端实现文件夹选择功能".to_string())
+async fn select_folder(app_handle: tauri::AppHandle) -> Result<String, String> {
+    use tauri_plugin_dialog::DialogExt;
+    
+    // 创建一个 oneshot channel 来等待结果
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    
+    app_handle
+        .dialog()
+        .file()
+        .set_title("选择文件夹")
+        .pick_folder(move |folder_path| {
+            let _ = tx.send(folder_path);
+        });
+    
+    // 等待回调完成
+    match rx.await {
+        Ok(Some(path)) => {
+            if let Some(path_str) = path.as_path().and_then(|p| p.to_str()) {
+                Ok(path_str.to_string())
+            } else {
+                Err("无法获取文件夹路径".to_string())
+            }
+        }
+        Ok(None) => Err("用户取消选择".to_string()),
+        Err(_) => Err("对话框操作失败".to_string()),
+    }
 }
 
 #[tauri::command]
@@ -419,10 +441,32 @@ async fn calculate_comparisons(
 }
 
 #[tauri::command]
-async fn select_export_folder() -> Result<String, String> {
-    // 在 Tauri 2.0 中，对话框功能需要通过前端调用
-    // 这里返回一个占位符，实际实现需要在前端处理
-    Err("请在前端实现导出文件夹选择功能".to_string())
+async fn select_export_folder(app_handle: tauri::AppHandle) -> Result<String, String> {
+    use tauri_plugin_dialog::DialogExt;
+    
+    // 创建一个 oneshot channel 来等待结果
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    
+    app_handle
+        .dialog()
+        .file()
+        .set_title("选择导出文件夹")
+        .pick_folder(move |folder_path| {
+            let _ = tx.send(folder_path);
+        });
+    
+    // 等待回调完成
+    match rx.await {
+        Ok(Some(path)) => {
+            if let Some(path_str) = path.as_path().and_then(|p| p.to_str()) {
+                Ok(path_str.to_string())
+            } else {
+                Err("无法获取导出文件夹路径".to_string())
+            }
+        }
+        Ok(None) => Err("用户取消选择".to_string()),
+        Err(_) => Err("对话框操作失败".to_string()),
+    }
 }
 
 #[derive(Debug, Deserialize)]

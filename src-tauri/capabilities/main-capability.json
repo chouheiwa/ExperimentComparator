@@ -7,6 +7,9 @@
     "core:path:allow-resolve-directory",
     "core:path:allow-join",
     "core:app:default",
+    "core:event:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
     "fs:default",
     "fs:allow-read-file",
     "fs:allow-write-file",
@@ -29,6 +32,9 @@
     "core:window:allow-unmaximize",
     "core:window:allow-unminimize",
     "core:window:allow-start-dragging",
+    "core:webview:default",
+    "core:webview:allow-webview-position",
+    "core:webview:allow-webview-size",
     {
       "identifier": "fs:scope",
       "allow": [{ "path": "$APPDATA" }, { "path": "$APPDATA/**/*" }]
