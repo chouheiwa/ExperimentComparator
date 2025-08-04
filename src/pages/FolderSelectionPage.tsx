@@ -1,16 +1,14 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
-import { Alert } from 'antd';
+import { showErrorDialog } from '../utils/errorDialog';
 import { ValidationResult, FolderData } from '../types';
 import { 
   useFolders, 
-  useLoading, 
-  useError,
+  useLoading,
   useSetFolders,
   useSetValidationResult,
   useSetLoading,
-  useSetError,
   useSetCurrentHistoryRecordId
 } from '../store';
 import FolderSelection from '../components/FolderSelection';
@@ -21,19 +19,16 @@ const FolderSelectionPage: React.FC = () => {
   // 状态
   const folders = useFolders();
   const loading = useLoading();
-  const error = useError();
   
   // 动作
   const setFolders = useSetFolders();
   const setValidationResult = useSetValidationResult();
   const setLoading = useSetLoading();
-  const setError = useSetError();
   const setCurrentHistoryRecordId = useSetCurrentHistoryRecordId();
 
   const handleFoldersSelected = async (selectedFolders: FolderData) => {
     setFolders(selectedFolders);
     setLoading(true);
-    setError(null);
     
     try {
       const comparisonPaths = selectedFolders.comparison.map(f => f.path);
@@ -43,33 +38,26 @@ const FolderSelectionPage: React.FC = () => {
       navigate('/validation');
     } catch (err) {
       console.error('文件夹验证失败:', err);
-      setError(typeof err === 'string' ? err : '文件夹验证失败，请检查路径是否正确');
+      const errorMessage = typeof err === 'string' ? err : '文件夹验证失败，请检查路径是否正确';
+      showErrorDialog(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleError = (errorMessage: string) => {
+    showErrorDialog(errorMessage);
+  };
+
   return (
-    <>
-      {error && (
-        <Alert
-          message="操作失败"
-          description={error}
-          type="error"
-          closable
-          onClose={() => setError(null)}
-          style={{ marginBottom: '24px' }}
-        />
-      )}
-      
-      <FolderSelection
-        onFoldersSelected={handleFoldersSelected}
-        loading={loading}
-        folders={folders}
-        onMainFoldersChanged={() => setCurrentHistoryRecordId(null)}
-      />
-    </>
+    <FolderSelection
+      onFoldersSelected={handleFoldersSelected}
+      loading={loading}
+      folders={folders}
+      onMainFoldersChanged={() => setCurrentHistoryRecordId(null)}
+      onError={handleError}
+    />
   );
 };
 
-export default FolderSelectionPage; 
+export default FolderSelectionPage;

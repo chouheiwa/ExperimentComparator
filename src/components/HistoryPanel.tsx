@@ -18,6 +18,7 @@ import {
 } from 'antd';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs';
+import { showErrorDialog } from '../utils/errorDialog';
 import { 
   HistoryOutlined, 
   DeleteOutlined, 
@@ -184,7 +185,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
       await writeTextFile(filePath, jsonString);
       message.success(`历史记录导出成功！保存至：${filePath}`);
     } catch (error) {
-      message.error('导出失败：' + error);
+      showErrorDialog('导出失败：' + error);
     }
   };
 
@@ -212,7 +213,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
       onImportRecords(importedRecords);
       message.success(`成功导入 ${importedRecords.length} 条历史记录！`);
     } catch (error) {
-      message.error('导入失败：' + error);
+      showErrorDialog('导入失败：' + error);
     }
   };
 
@@ -242,7 +243,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
         await onClearCache();
         message.success('缓存已清空！');
       } catch (error) {
-        message.error('清空缓存失败');
+        showErrorDialog('清空缓存失败');
       }
     }
   };
@@ -257,7 +258,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
           message.info('没有发现过期的缓存项');
         }
       } catch (error) {
-        message.error('清理缓存失败');
+        showErrorDialog('清理缓存失败');
       }
     }
   };
@@ -606,4 +607,4 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   );
 };
 
-export default HistoryPanel; 
+export default HistoryPanel;

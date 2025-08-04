@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Button, Select, Switch, Row, Col, Typography, Tag, Space, Modal, message } from 'antd';
+import { Card, Row, Col, Select, Switch, Button, Space, Typography, Tag, Modal, message } from 'antd';
 import { DownloadOutlined, StarOutlined, StarFilled } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/core';
+import { showErrorDialog } from '../utils/errorDialog';
 import { ComparisonResult } from '../types';
 import ImageComparisonGrid from './ImageComparisonGrid';
 import SafeImage from './SafeImage';
@@ -200,7 +201,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
     } catch (error) {
       message.destroy();
       console.error('导出失败:', error);
-      message.error(`导出失败: ${error}`);
+      showErrorDialog(`导出失败: ${error}`);
     }
   };
 
@@ -413,4 +414,4 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
   );
 };
 
-export default AnalysisView; 
+export default AnalysisView;

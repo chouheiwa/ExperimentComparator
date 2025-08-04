@@ -1,22 +1,20 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
-import { Alert } from 'antd';
+import { showErrorDialog } from '../utils/errorDialog';
 import { ComparisonResult } from '../types';
 import { 
   useFolders,
-  useValidationResult, 
-  useLoading, 
-  useError,
+  useValidationResult,
+  useLoading,
+  useProgressInfo,
   useSetComparisonResults,
   useSetLoading,
-  useSetError,
   useAddHistoryRecord,
   useLoadFromCacheIncremental,
   useSaveToCache,
   useUpdateProgress,
   useResetProgress,
-  useProgressInfo,
   useResetState
 } from '../store';
 import ValidationResults from '../components/ValidationResults';
@@ -29,13 +27,11 @@ const ValidationPage: React.FC = () => {
   const folders = useFolders();
   const validationResult = useValidationResult();
   const loading = useLoading();
-  const error = useError();
   const progressInfo = useProgressInfo();
   
   // 动作
   const setComparisonResults = useSetComparisonResults();
   const setLoading = useSetLoading();
-  const setError = useSetError();
   const addHistoryRecord = useAddHistoryRecord();
   const loadFromCacheIncremental = useLoadFromCacheIncremental();
   const saveToCache = useSaveToCache();
@@ -54,7 +50,6 @@ const ValidationPage: React.FC = () => {
     if (!validationResult) return;
     
     setLoading(true);
-    setError(null);
     resetProgress(); // 重置进度状态
     
     try {
@@ -171,7 +166,8 @@ const ValidationPage: React.FC = () => {
       
     } catch (err) {
       console.error('对比计算失败:', err);
-      setError(typeof err === 'string' ? err : '对比计算失败，请稍后重试');
+      const errorMessage = typeof err === 'string' ? err : '对比计算失败，请稍后重试';
+      showErrorDialog(errorMessage);
     } finally {
       setLoading(false);
       // 延迟重置进度，让用户看到完成状态
@@ -192,17 +188,6 @@ const ValidationPage: React.FC = () => {
 
   return (
     <>
-      {error && (
-        <Alert
-          message="操作失败"
-          description={error}
-          type="error"
-          closable
-          onClose={() => setError(null)}
-          style={{ marginBottom: '24px' }}
-        />
-      )}
-
       {/* 根据是否有进度信息来决定显示方式 */}
       {progressInfo ? (
         <ProgressIndicator progressInfo={progressInfo} />
@@ -218,4 +203,4 @@ const ValidationPage: React.FC = () => {
   );
 };
 
-export default ValidationPage; 
+export default ValidationPage;

@@ -33,6 +33,7 @@ interface FolderSelectionProps {
   loading: boolean;
   folders?: FolderData;
   onMainFoldersChanged?: () => void; // 主要文件夹变化时清除历史记录ID
+  onError?: (error: string) => void; // 错误回调
 }
 
 // 可拖拽的对比文件夹项组件
@@ -175,12 +176,11 @@ const generateDefaultName = (index: number): string => {
   return `对比数据 ${index + 1}`;
 };
 
-const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, loading, folders, onMainFoldersChanged }) => {
+const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, loading, folders, onMainFoldersChanged, onError }) => {
   const [originalFolder, setOriginalFolder] = useState('');
   const [gtFolder, setGtFolder] = useState('');
   const [myFolder, setMyFolder] = useState('');
   const [comparisonFolders, setComparisonFolders] = useState<ComparisonFolder[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -239,7 +239,6 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
       setGtFolder(folders.gt);
       setMyFolder(folders.my);
       setComparisonFolders(folders.comparison);
-      setError(null);
     }
   }, [folders]);
 
@@ -248,7 +247,6 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
     if (paths.length === 0) return;
     
     try {
-      setError(null);
       
       // 获取最新的状态值（使用refs确保不会使用过时的闭包值）
       let currentOriginalFolder = originalFolderRef.current;
@@ -299,7 +297,7 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
         onMainFoldersChanged?.();
       }
     } catch (err) {
-      setError('处理拖放文件时出错: ' + err);
+      onError?.('处理拖放文件时出错: ' + err);
     }
   }, [onMainFoldersChanged]);
 
@@ -341,19 +339,16 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
 
   const handleOriginalFolderChange = (path: string) => {
     setOriginalFolder(path);
-    setError(null);
     onMainFoldersChanged?.(); // 修改主要文件夹，清除历史记录ID
   };
 
   const handleGtFolderChange = (path: string) => {
     setGtFolder(path);
-    setError(null);
     onMainFoldersChanged?.(); // 修改主要文件夹，清除历史记录ID
   };
 
   const handleMyFolderChange = (path: string) => {
     setMyFolder(path);
-    setError(null);
     onMainFoldersChanged?.(); // 修改主要文件夹，清除历史记录ID
   };
 
@@ -405,7 +400,6 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
         path: pendingFolderPath
       };
       setComparisonFolders([...comparisonFolders, newFolder]);
-      setError(null);
       
       // 重置模态框状态
       setIsModalVisible(false);
@@ -423,7 +417,7 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
 
   const handleSubmit = () => {
     if (!originalFolder || !gtFolder || !myFolder || comparisonFolders.length === 0) {
-      setError('请选择原始图片文件夹、GT文件夹、实验数据文件夹和至少一个对比文件夹');
+      onError?.('请选择原始图片文件夹、GT文件夹、实验数据文件夹和至少一个对比文件夹');
       return;
     }
     
@@ -577,15 +571,7 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
         </Card>
       )}
 
-      {error && (
-        <Alert
-          message={error}
-          type="error"
-          closable
-          onClose={() => setError(null)}
-          style={{ marginTop: '16px' }}
-        />
-      )}
+
 
       <div style={{ marginTop: '32px', textAlign: 'center' }}>
         <Button

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Button, Typography, Space, Row, Col, Statistic, Switch, message, Modal } from 'antd';
 import { LeftOutlined, RightOutlined, ReloadOutlined, BarChartOutlined, DownloadOutlined } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/core';
+import { showErrorDialog } from '../utils/errorDialog';
 import { ComparisonResult } from '../types';
 import { getIouStatus } from '../utils';
 import ImageComparisonGrid, { getSortedEntries } from './ImageComparisonGrid';
@@ -63,7 +64,7 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ results, onReset }) => 
     } catch (error) {
       message.destroy();
       console.error('导出失败:', error);
-      message.error(`导出失败: ${error}`);
+      showErrorDialog(`导出失败: ${error}`);
     }
   };
 

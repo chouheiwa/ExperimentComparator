@@ -41,7 +41,7 @@ struct ProgressEvent {
 fn get_image_files(dir_path: &str) -> Result<Vec<String>, String> {
     let path = Path::new(dir_path);
     if !path.exists() {
-        return Err("文件夹不存在".to_string());
+        return Err(format!("文件夹不存在: {}", dir_path));
     }
 
     let mut files = Vec::new();
@@ -196,11 +196,22 @@ async fn validate_folders(folders: Vec<String>) -> Result<ValidationResult, Stri
     }
 
     let mut folder_files = Vec::new();
+    let folder_types = ["原始图片", "GT", "我的实验数据"];
 
     // 获取每个文件夹的文件列表
-    for folder in &folders {
-        let files = get_image_files(folder)?;
-        folder_files.push(files);
+    for (index, folder) in folders.iter().enumerate() {
+        match get_image_files(folder) {
+            Ok(files) => folder_files.push(files),
+            Err(_err) => {
+                // 根据文件夹位置确定类型
+                let folder_type = if index < folder_types.len() {
+                    folder_types[index]
+                } else {
+                    &format!("对照实验{}", index - 2)
+                };
+                return Err(format!("{}文件夹不存在: {}", folder_type, folder));
+            }
+        }
     }
 
     // 找出所有文件夹共有的文件
@@ -441,6 +452,29 @@ async fn calculate_comparisons(
 }
 
 #[tauri::command]
+async fn show_error_dialog(app_handle: tauri::AppHandle, title: String, message: String) -> Result<(), String> {
+    use tauri_plugin_dialog::DialogExt;
+    
+    // 创建一个 oneshot channel 来等待结果
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    
+    app_handle
+        .dialog()
+        .message(message)
+        .title(title)
+        .kind(tauri_plugin_dialog::MessageDialogKind::Error)
+        .show(move |_| {
+            let _ = tx.send(());
+        });
+    
+    // 等待对话框关闭
+    match rx.await {
+        Ok(_) => Ok(()),
+        Err(_) => Err("对话框操作失败".to_string()),
+    }
+}
+
+#[tauri::command]
 async fn select_export_folder(app_handle: tauri::AppHandle) -> Result<String, String> {
     use tauri_plugin_dialog::DialogExt;
     
@@ -565,7 +599,8 @@ fn main() {
             calculate_comparisons,
             calculate_comparisons_with_progress,
             select_export_folder,
-            export_selected_images
+            export_selected_images,
+            show_error_dialog
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
