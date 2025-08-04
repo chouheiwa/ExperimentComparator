@@ -207,9 +207,9 @@ async fn validate_folders(folders: Vec<String>) -> Result<ValidationResult, Stri
                 let folder_type = if index < folder_types.len() {
                     folder_types[index]
                 } else {
-                    &format!("对照实验{}", index - 2)
+                    &format!("对照实验 {}", index - 2)
                 };
-                return Err(format!("{}文件夹不存在: {}", folder_type, folder));
+                return Err(format!("\'{}\' 文件夹不存在: {}", folder_type, folder));
             }
         }
     }
