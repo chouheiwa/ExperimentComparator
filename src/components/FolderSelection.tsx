@@ -3,7 +3,6 @@ import { Card, Button, Space, Tag, Alert, Row, Col, Typography, Input, Modal } f
 import { DeleteOutlined, PlusOutlined, InboxOutlined, EditOutlined, HolderOutlined } from '@ant-design/icons';
 import { listen } from '@tauri-apps/api/event';
 import { dirname } from '@tauri-apps/api/path';
-import { exists } from '@tauri-apps/plugin-fs';
 import { invoke } from '@tauri-apps/api/core';
 import {
   DndContext,
