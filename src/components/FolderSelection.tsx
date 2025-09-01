@@ -3,6 +3,7 @@ import { Card, Button, Space, Tag, Alert, Row, Col, Typography, Input, Modal } f
 import { DeleteOutlined, PlusOutlined, InboxOutlined, EditOutlined, HolderOutlined } from '@ant-design/icons';
 import { listen } from '@tauri-apps/api/event';
 import { dirname } from '@tauri-apps/api/path';
+import { exists } from '@tauri-apps/plugin-fs';
 import { invoke } from '@tauri-apps/api/core';
 import {
   DndContext,
@@ -244,7 +245,19 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
 
   // 统一的拖放处理函数 - 按顺序填入
   const handleFolderDrop = useCallback(async (paths: string[]) => {
-    if (paths.length === 0) return;
+    // 安全检查：确保 paths 是有效的数组
+    if (!Array.isArray(paths)) {
+      console.error('handleFolderDrop: paths 不是数组:', paths);
+      onError?.('拖拽的文件路径格式不正确');
+      return;
+    }
+    
+    if (paths.length === 0) {
+      console.log('handleFolderDrop: 没有拖拽的路径');
+      return;
+    }
+    
+    console.log('handleFolderDrop: 处理路径:', paths);
     
     try {
       
@@ -257,8 +270,16 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
       
       for (const path of paths) {
         // 检查是否为文件，如果是则获取其父目录
-        const isFile = await invoke<boolean>('is_file', { path });
-        const finalPath = isFile ? await dirname(path) : path;
+        let finalPath = path;
+        try {
+          const isFile = await invoke<boolean>('is_file', { path });
+          if (isFile) {
+            finalPath = await dirname(path);
+          }
+        } catch (pathError) {
+          console.warn('检查路径类型时出错，使用原始路径:', pathError);
+          // 如果检查失败，直接使用原始路径
+        }
 
         // 按顺序填入：原始图片 -> GT -> 我的实验数据 -> 对比数据
         // 只有当对应字段为空时才填入，不覆盖已有值
@@ -297,7 +318,11 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
         onMainFoldersChanged?.();
       }
     } catch (err) {
-      onError?.('处理拖放文件时出错: ' + err);
+      console.error('处理拖放文件时出错:', err);
+      const errorMessage = err instanceof Error ? err.message : 
+                          typeof err === 'string' ? err : 
+                          '处理拖放文件时出现未知错误';
+      onError?.(`处理拖放文件时出错: ${errorMessage}`);
     }
   }, [onMainFoldersChanged]);
 
@@ -313,8 +338,34 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
       // 监听拖放事件 - Tauri 2.0 中的正确事件名称
       unlistenDrop = await listen('tauri://drag-drop', (event) => {
         setIsDragging(false);
-        const paths = event.payload as string[];
-        handleFolderDrop(paths);
+        try {
+          console.log('拖拽事件 payload:', event.payload);
+          let paths: string[];
+          
+          // 处理不同的 payload 格式
+          if (Array.isArray(event.payload)) {
+            paths = event.payload as string[];
+          } else if (event.payload && typeof event.payload === 'object' && 'paths' in event.payload) {
+            paths = (event.payload as any).paths as string[];
+          } else if (typeof event.payload === 'string') {
+            paths = [event.payload];
+          } else {
+            console.error('未知的拖拽事件 payload 格式:', event.payload);
+            onError?.('拖拽事件格式不正确');
+            return;
+          }
+          
+          if (!Array.isArray(paths) || paths.length === 0) {
+            console.error('拖拽路径不是有效数组:', paths);
+            onError?.('拖拽的文件路径格式不正确');
+            return;
+          }
+          
+          handleFolderDrop(paths);
+        } catch (error) {
+          console.error('处理拖拽事件时出错:', error);
+          onError?.('处理拖拽事件时出现错误');
+        }
       });
 
       // 监听拖拽悬停事件

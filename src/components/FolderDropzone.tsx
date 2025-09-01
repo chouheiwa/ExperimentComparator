@@ -28,7 +28,11 @@ const FolderDropzone: React.FC<FolderDropzoneProps> = ({
       const folderPath = await invoke<string>('select_folder');
       onChange(folderPath);
     } catch (err) {
-      setError(err as string);
+      console.error('选择文件夹时出错:', err);
+      const errorMessage = err instanceof Error ? err.message : 
+                          typeof err === 'string' ? err : 
+                          '选择文件夹时出现未知错误';
+      setError(errorMessage);
     }
   }, [onChange]);
 
@@ -132,4 +136,4 @@ const FolderDropzone: React.FC<FolderDropzoneProps> = ({
   );
 };
 
-export default FolderDropzone; 
+export default FolderDropzone;
