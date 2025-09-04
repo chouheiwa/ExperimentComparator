@@ -82,21 +82,32 @@ fn calculate_iou(img1_path: &str, img2_path: &str) -> Result<f64, String> {
     let (width1, height1) = img1.dimensions();
     let (width2, height2) = img2.dimensions();
 
-    if width1 != width2 || height1 != height2 {
-        return Err(format!(
-            "图片尺寸: {}x{} 对 {}x{} 不匹配: {} vs {}",
-            width1, height1, width2, height2, img1_path, img2_path
-        ));
-    }
+    // 处理图像尺寸不一致的情况：将大的图像压缩到小的图像尺寸
+    let (target_width, target_height) = (
+        width1.min(width2),
+        height1.min(height2)
+    );
 
-    let img1_gray = img1.to_luma8();
-    let img2_gray = img2.to_luma8();
+    let img1_processed = if width1 != target_width || height1 != target_height {
+        img1.resize(target_width, target_height, image::imageops::FilterType::Lanczos3)
+    } else {
+        img1
+    };
+
+    let img2_processed = if width2 != target_width || height2 != target_height {
+        img2.resize(target_width, target_height, image::imageops::FilterType::Lanczos3)
+    } else {
+        img2
+    };
+
+    let img1_gray = img1_processed.to_luma8();
+    let img2_gray = img2_processed.to_luma8();
 
     let mut intersection = 0u32;
     let mut union = 0u32;
 
-    for y in 0..height1 {
-        for x in 0..width1 {
+    for y in 0..target_height {
+        for x in 0..target_width {
             let pixel1 = img1_gray.get_pixel(x, y)[0] > 128;
             let pixel2 = img2_gray.get_pixel(x, y)[0] > 128;
 
@@ -124,18 +135,32 @@ fn calculate_accuracy(img1_path: &str, img2_path: &str) -> Result<f64, String> {
     let (width1, height1) = img1.dimensions();
     let (width2, height2) = img2.dimensions();
 
-    if width1 != width2 || height1 != height2 {
-        return Err("图片尺寸不匹配".to_string());
-    }
+    // 处理图像尺寸不一致的情况：将大的图像压缩到小的图像尺寸
+    let (target_width, target_height) = (
+        width1.min(width2),
+        height1.min(height2)
+    );
 
-    let img1_gray = img1.to_luma8();
-    let img2_gray = img2.to_luma8();
+    let img1_processed = if width1 != target_width || height1 != target_height {
+        img1.resize(target_width, target_height, image::imageops::FilterType::Lanczos3)
+    } else {
+        img1
+    };
+
+    let img2_processed = if width2 != target_width || height2 != target_height {
+        img2.resize(target_width, target_height, image::imageops::FilterType::Lanczos3)
+    } else {
+        img2
+    };
+
+    let img1_gray = img1_processed.to_luma8();
+    let img2_gray = img2_processed.to_luma8();
 
     let mut correct_pixels = 0u32;
-    let total_pixels = (width1 * height1) as u32;
+    let total_pixels = (target_width * target_height) as u32;
 
-    for y in 0..height1 {
-        for x in 0..width1 {
+    for y in 0..target_height {
+        for x in 0..target_width {
             let pixel1 = img1_gray.get_pixel(x, y)[0] > 128;
             let pixel2 = img2_gray.get_pixel(x, y)[0] > 128;
 

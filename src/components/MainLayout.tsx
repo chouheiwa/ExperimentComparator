@@ -20,10 +20,7 @@ import {
   useGetAllCacheDetails
 } from '../store';
 import SideDrawer, { DrawerType } from './SideDrawer';
-import { exportHistoryToJson, importHistoryFromJson } from '../utils/history';
-import { save, open } from '@tauri-apps/plugin-dialog';
-import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs';
-import { showErrorDialog } from '../utils/errorDialog';
+import HistoryJsonModal from './HistoryJsonModal';
 import { HistoryRecord } from '../types';
 
 const { Header, Content } = Layout;
@@ -35,6 +32,10 @@ const MainLayout: React.FC = () => {
   // 抽屉状态
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerType, setDrawerType] = useState<DrawerType>(null);
+  
+  // JSON弹窗状态
+  const [jsonModalVisible, setJsonModalVisible] = useState(false);
+  const [jsonModalMode, setJsonModalMode] = useState<'export' | 'import'>('export');
   
   // 状态
   const loading = useLoading();
@@ -67,86 +68,17 @@ const MainLayout: React.FC = () => {
 
   // 历史记录处理函数
   const handleHistoryExport = async () => {
-    try {
-      const jsonString = exportHistoryToJson(historyRecords);
-      const defaultFileName = `datachoosing-history-${new Date().toISOString().split('T')[0]}.json`;
-      
-      // 检查是否在 Tauri 环境中
-      if (typeof window !== 'undefined' && (window as any).__TAURI__) {
-        const filePath = await save({
-          title: '导出历史记录',
-          defaultPath: defaultFileName,
-          filters: [{
-            name: 'JSON 文件',
-            extensions: ['json']
-          }]
-        });
-
-        if (filePath) {
-          await writeTextFile(filePath, jsonString);
-        }
-      } else {
-        // 在开发环境中，使用浏览器下载
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = defaultFileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      console.error('导出历史记录失败:', error);
-      showErrorDialog('导出历史记录失败');
-    }
+    setJsonModalMode('export');
+    setJsonModalVisible(true);
   };
 
   const handleHistoryImport = async () => {
-    try {
-      // 检查是否在 Tauri 环境中
-       if (typeof window !== 'undefined' && (window as any).__TAURI__) {
-        const filePath = await open({
-          title: '导入历史记录',
-          filters: [{
-            name: 'JSON 文件',
-            extensions: ['json']
-          }]
-        });
+    setJsonModalMode('import');
+    setJsonModalVisible(true);
+  };
 
-        if (filePath && !Array.isArray(filePath)) {
-          const content = await readTextFile(filePath);
-          const importedRecords = importHistoryFromJson(content);
-          importHistoryRecords(importedRecords);
-        }
-      } else {
-        // 在开发环境中，使用文件输入
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
-        input.onchange = (e) => {
-          const file = (e.target as HTMLInputElement).files?.[0];
-          if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              try {
-                const content = e.target?.result as string;
-                const importedRecords = importHistoryFromJson(content);
-                importHistoryRecords(importedRecords);
-              } catch (error) {
-                showErrorDialog('导入历史记录失败：文件格式错误');
-              }
-            };
-            reader.readAsText(file);
-          }
-        };
-        input.click();
-      }
-    } catch (error) {
-      console.error('导入历史记录失败:', error);
-      showErrorDialog('导入历史记录失败');
-    }
+  const handleJsonModalImport = async (records: HistoryRecord[]) => {
+    importHistoryRecords(records);
   };
 
   // 包装函数以匹配异步签名
@@ -164,6 +96,11 @@ const MainLayout: React.FC = () => {
 
   // 监听来自 Rust 后端的进度事件
   useEffect(() => {
+    // 检查是否在 Tauri 环境中
+    if (typeof window === 'undefined' || !(window as any).__TAURI__) {
+      return;
+    }
+
     const unlisten = listen('progress_update', (event) => {
       const progressData = event.payload as {
         current: number;
@@ -304,6 +241,15 @@ const MainLayout: React.FC = () => {
         cacheMetadata={cacheMetadata}
         onRefreshCache={refreshCacheMetadata}
         onGetAllCacheDetails={getAllCacheDetails}
+      />
+      
+      {/* JSON编辑弹窗 */}
+      <HistoryJsonModal
+        visible={jsonModalVisible}
+        onClose={() => setJsonModalVisible(false)}
+        mode={jsonModalMode}
+        historyRecords={historyRecords}
+        onImport={handleJsonModalImport}
       />
     </Layout>
   );

@@ -50,13 +50,22 @@ const HistoryManagement: React.FC<HistoryManagementProps> = ({
   const [editDescription, setEditDescription] = useState('');
 
   const handleExport = async () => {
+    console.log('HistoryManagement: 导出按钮被点击');
+    console.log('HistoryManagement: onExport 函数是否存在:', !!onExport);
+    console.log('HistoryManagement: 历史记录数量:', historyRecords.length);
+    
     if (onExport) {
       try {
+        console.log('HistoryManagement: 调用父组件的 onExport 函数');
         await onExport();
-        // message.success('历史记录导出成功！');
-      } catch (error) {
-        showErrorDialog('导出历史记录失败');
+        console.log('HistoryManagement: onExport 函数调用成功');
+      } catch (error: any) {
+        console.error('HistoryManagement: onExport 函数调用失败:', error);
+        showErrorDialog('导出历史记录失败', 'error');
       }
+    } else {
+      console.error('HistoryManagement: onExport 函数未定义');
+      showErrorDialog('导出功能未实现', 'error');
     }
   };
 
@@ -68,8 +77,8 @@ const HistoryManagement: React.FC<HistoryManagementProps> = ({
         await onEdit(editingRecord.id, editName, editDescription);
         setEditingRecord(null);
         // message.success('历史记录更新成功！');
-      } catch (error) {
-        showErrorDialog('更新历史记录失败');
+      } catch (error: any) {
+        showErrorDialog('更新历史记录失败', 'error');
       }
     }
   };
@@ -79,8 +88,8 @@ const HistoryManagement: React.FC<HistoryManagementProps> = ({
       try {
         await onDelete(id);
         // message.success('历史记录删除成功！');
-      } catch (error) {
-        showErrorDialog('删除历史记录失败');
+      } catch (error: any) {
+        showErrorDialog('删除历史记录失败', 'error');
       }
     }
   };

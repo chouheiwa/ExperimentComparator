@@ -378,6 +378,15 @@ export const clearAllCache = async (): Promise<void> => {
 
 // 获取缓存元数据
 export const getCacheMetadata = async (): Promise<CacheMetadata> => {
+  // 检查是否在 Tauri 环境中
+  if (typeof window === 'undefined' || !(window as any).__TAURI__) {
+    return {
+      totalSize: 0,
+      count: 0,
+      lastCleanup: new Date().toISOString()
+    };
+  }
+
   try {
     await ensureCacheDir();
     
@@ -514,4 +523,4 @@ export const generateBaseCacheKey = (basePaths: BaseFolderPaths): string => {
 
 export const generateSingleComparisonCacheKey = (basePaths: BaseFolderPaths, comparisonPath: string): string => {
   return generateCacheFileName(basePaths.gt, comparisonPath);
-}; 
+};

@@ -334,6 +334,11 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
     let unlistenDragLeave: (() => void) | undefined;
 
     const setupListeners = async () => {
+      // 检查是否在 Tauri 环境中
+      if (typeof window === 'undefined' || !(window as any).__TAURI__) {
+        return;
+      }
+
       // 监听拖放事件 - Tauri 2.0 中的正确事件名称
       unlistenDrop = await listen('tauri://drag-drop', (event) => {
         setIsDragging(false);
