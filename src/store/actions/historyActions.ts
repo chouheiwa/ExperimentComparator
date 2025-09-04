@@ -27,7 +27,7 @@ export const createHistoryActions: StateCreator<
     // 如果当前有加载的历史记录ID，更新该记录而不是新增
     if (currentHistoryRecordId) {
       const recordIndex = currentRecords.findIndex(record => record.id === currentHistoryRecordId);
-      console.log('recordIndex', recordIndex);
+  
       if (recordIndex !== -1) {
         const updatedRecord = {
           ...currentRecords[recordIndex],
@@ -143,4 +143,4 @@ export const createHistoryActions: StateCreator<
       saveHistoryToStorage(allRecords);
     }
   }
-}); 
+});

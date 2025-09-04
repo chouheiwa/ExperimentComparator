@@ -7,6 +7,7 @@ use std::fs;
 use std::path::Path;
 use tauri::Emitter;
 
+
 #[derive(Debug, Serialize, Deserialize)]
 struct FolderInfo {
     name: String,
@@ -36,6 +37,8 @@ struct ProgressEvent {
     percentage: f64,
     current_file: String,
 }
+
+
 
 // 获取文件夹中的所有图片文件
 fn get_image_files(dir_path: &str) -> Result<Vec<String>, String> {
@@ -73,7 +76,7 @@ fn get_image_files(dir_path: &str) -> Result<Vec<String>, String> {
 }
 
 // 计算两个图片的IOU
-fn calculate_iou(img1_path: &str, img2_path: &str) -> Result<f64, String> {
+fn calculate_iou(img1_path: &str, img2_path: &str, _window: Option<&tauri::Window>) -> Result<f64, String> {
     let img1 = image::open(img1_path).map_err(|e| format!("无法打开图片1: {}", e))?;
     let img2 = image::open(img2_path).map_err(|e| format!("无法打开图片2: {}", e))?;
 
@@ -81,6 +84,13 @@ fn calculate_iou(img1_path: &str, img2_path: &str) -> Result<f64, String> {
     // 假设图片是分割掩码，计算像素级IOU
     let (width1, height1) = img1.dimensions();
     let (width2, height2) = img2.dimensions();
+
+    // 检查图像尺寸是否一致
+    if width1 != width2 || height1 != height2 {
+        let log_message = format!("[IOU计算] 图像尺寸不一致: 图片1 {}x{}, 图片2 {}x{} | 图片1: {} | 图片2: {} | 将调整到统一尺寸: {}x{}", 
+            width1, height1, width2, height2, img1_path, img2_path, width1.min(width2), height1.min(height2));
+        println!("{}", log_message);
+    }
 
     // 处理图像尺寸不一致的情况：将大的图像压缩到小的图像尺寸
     let (target_width, target_height) = (
@@ -128,12 +138,19 @@ fn calculate_iou(img1_path: &str, img2_path: &str) -> Result<f64, String> {
 }
 
 // 计算两个图片的准确率
-fn calculate_accuracy(img1_path: &str, img2_path: &str) -> Result<f64, String> {
+fn calculate_accuracy(img1_path: &str, img2_path: &str, _window: Option<&tauri::Window>) -> Result<f64, String> {
     let img1 = image::open(img1_path).map_err(|e| format!("无法打开图片1: {}", e))?;
     let img2 = image::open(img2_path).map_err(|e| format!("无法打开图片2: {}", e))?;
 
     let (width1, height1) = img1.dimensions();
     let (width2, height2) = img2.dimensions();
+
+    // 检查图像尺寸是否一致
+    if width1 != width2 || height1 != height2 {
+        let log_message = format!("[准确率计算] 图像尺寸不一致: 图片1 {}x{}, 图片2 {}x{} | 图片1: {} | 图片2: {} | 将调整到统一尺寸: {}x{}", 
+            width1, height1, width2, height2, img1_path, img2_path, width1.min(width2), height1.min(height2));
+        println!("{}", log_message);
+    }
 
     // 处理图像尺寸不一致的情况：将大的图像压缩到小的图像尺寸
     let (target_width, target_height) = (
@@ -317,7 +334,7 @@ async fn calculate_comparisons_with_progress(
         paths.insert("我的结果".to_string(), my_path.clone());
 
         // 计算我的结果与GT的IOU和准确率
-        match calculate_iou(&gt_path, &my_path) {
+        match calculate_iou(&gt_path, &my_path, Some(&window)) {
             Ok(iou) => {
                 iou_scores.insert("我的结果".to_string(), iou);
             }
@@ -327,7 +344,7 @@ async fn calculate_comparisons_with_progress(
             }
         }
 
-        match calculate_accuracy(&gt_path, &my_path) {
+        match calculate_accuracy(&gt_path, &my_path, Some(&window)) {
             Ok(accuracy) => {
                 accuracy_scores.insert("我的结果".to_string(), accuracy);
             }
@@ -345,7 +362,7 @@ async fn calculate_comparisons_with_progress(
             paths.insert(comp_name.clone(), comp_path.clone());
 
             // 计算IOU
-            match calculate_iou(&gt_path, &comp_path) {
+            match calculate_iou(&gt_path, &comp_path, Some(&window)) {
                 Ok(iou) => {
                     iou_scores.insert(comp_name.clone(), iou);
                 }
@@ -356,7 +373,7 @@ async fn calculate_comparisons_with_progress(
             }
 
             // 计算准确率
-            match calculate_accuracy(&gt_path, &comp_path) {
+            match calculate_accuracy(&gt_path, &comp_path, Some(&window)) {
                 Ok(accuracy) => {
                     accuracy_scores.insert(comp_name.clone(), accuracy);
                 }
@@ -415,7 +432,7 @@ async fn calculate_comparisons(
         paths.insert("我的结果".to_string(), my_path.clone());
 
         // 计算我的结果与GT的IOU和准确率
-        match calculate_iou(&gt_path, &my_path) {
+        match calculate_iou(&gt_path, &my_path, None) {
             Ok(iou) => {
                 iou_scores.insert("我的结果".to_string(), iou);
             }
@@ -425,7 +442,7 @@ async fn calculate_comparisons(
             }
         }
 
-        match calculate_accuracy(&gt_path, &my_path) {
+        match calculate_accuracy(&gt_path, &my_path, None) {
             Ok(accuracy) => {
                 accuracy_scores.insert("我的结果".to_string(), accuracy);
             }
@@ -443,7 +460,7 @@ async fn calculate_comparisons(
             paths.insert(comp_name.clone(), comp_path.clone());
 
             // 计算IOU
-            match calculate_iou(&gt_path, &comp_path) {
+            match calculate_iou(&gt_path, &comp_path, None) {
                 Ok(iou) => {
                     iou_scores.insert(comp_name.clone(), iou);
                 }
@@ -454,7 +471,7 @@ async fn calculate_comparisons(
             }
 
             // 计算准确率
-            match calculate_accuracy(&gt_path, &comp_path) {
+            match calculate_accuracy(&gt_path, &comp_path, None) {
                 Ok(accuracy) => {
                     accuracy_scores.insert(comp_name.clone(), accuracy);
                 }

@@ -72,14 +72,20 @@ const readGTIndex = async (): Promise<Record<string, GTCacheIndex>> => {
   try {
     await ensureCacheDir();
     const indexPath = await join(await getCacheDir(), GT_INDEX_FILE);
+
     const fileExists = await exists(indexPath);
+
     
     if (fileExists) {
       const content = await readTextFile(indexPath);
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+
+      return parsed;
+    } else {
+
     }
   } catch (error) {
-    console.error('读取GT索引失败:', error);
+    console.error('[Cache Debug] 读取GT索引失败:', error);
   }
   
   return {};
@@ -107,19 +113,19 @@ export const getCachedSingleComparison = async (
     const gtIndex = await readGTIndex();
     const gtHash = generatePathHash(basePaths.gt);
     
-    console.log(`尝试获取缓存: GT=${basePaths.gt}, 对比=${comparisonPath}`);
+  
     
     // 查找GT条目
     const gtEntry = gtIndex[gtHash];
     if (!gtEntry || gtEntry.gtPath !== basePaths.gt) {
-      console.log('未找到GT缓存');
+  
       return null;
     }
     
     // 查找对比条目
     const comparisonEntry = gtEntry.comparisons.find(comp => comp.comparisonPath === comparisonPath);
     if (!comparisonEntry) {
-      console.log('未找到对比缓存');
+  
       return null;
     }
     
@@ -128,14 +134,14 @@ export const getCachedSingleComparison = async (
     const fileExists = await exists(cacheFilePath);
     
     if (!fileExists) {
-      console.log('缓存文件不存在');
+  
       return null;
     }
     
     const cacheData = await readTextFile(cacheFilePath);
     const result: CachedSingleComparison = JSON.parse(cacheData);
     
-    console.log('找到缓存结果');
+  
     
     // 更新访问时间
     comparisonEntry.lastAccessed = new Date().toISOString();
@@ -200,7 +206,7 @@ export const saveSingleComparisonCache = async (result: CachedSingleComparison):
     // 保存索引
     await saveGTIndex(gtIndex);
     
-    console.log(`缓存已保存: ${fileName}`);
+  
   } catch (error) {
     console.error('保存缓存失败:', error);
   }
@@ -273,8 +279,10 @@ export const getAllCachedComparisons = async (basePaths: BaseFolderPaths): Promi
 export const getAllCacheDetails = async (): Promise<CachedSingleComparison[]> => {
   try {
     await ensureCacheDir();
+  
     
     const gtIndex = await readGTIndex();
+  
     const results: CachedSingleComparison[] = [];
     
     for (const gtEntry of Object.values(gtIndex)) {
@@ -378,19 +386,12 @@ export const clearAllCache = async (): Promise<void> => {
 
 // 获取缓存元数据
 export const getCacheMetadata = async (): Promise<CacheMetadata> => {
-  // 检查是否在 Tauri 环境中
-  if (typeof window === 'undefined' || !(window as any).__TAURI__) {
-    return {
-      totalSize: 0,
-      count: 0,
-      lastCleanup: new Date().toISOString()
-    };
-  }
-
   try {
     await ensureCacheDir();
+  
     
     const gtIndex = await readGTIndex();
+  
     let totalSize = 0;
     let count = 0;
     

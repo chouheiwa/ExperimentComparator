@@ -1,6 +1,6 @@
 [package]
 name = "experiment-comparator"
-version = "1.0.8"
+version = "1.0.9"
 description = "A modern desktop application for comparing machine learning model experiment results"
 authors = ["chouheiwa"]
 license = "MIT"
@@ -19,6 +19,7 @@ imageproc = "0.23"
 tokio = { version = "1.0", features = ["full"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+chrono = { version = "0.4", features = ["serde"] }
 
 [features]
 default = []

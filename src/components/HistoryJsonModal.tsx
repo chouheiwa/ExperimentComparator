@@ -72,7 +72,7 @@ const HistoryJsonModal: React.FC<HistoryJsonModalProps> = ({
         setLoading(true);
         const defaultFileName = `datachoosing-history-${new Date().toISOString().split('T')[0]}.json`;
         
-        console.log('打开保存对话框...');
+    
         const filePath = await save({
           title: '导出历史记录',
           defaultPath: defaultFileName,
@@ -82,24 +82,24 @@ const HistoryJsonModal: React.FC<HistoryJsonModalProps> = ({
           }]
         });
         
-        console.log('用户选择的文件路径:', filePath);
+  
         
         if (filePath) {
-          console.log('开始写入文件...');
+    
           try {
             await writeTextFile(filePath, jsonContent);
-            console.log('文件写入成功!');
+    
             showErrorDialog('导出历史记录成功', 'success');
           } catch (writeError: any) {
             console.error('文件写入失败:', writeError);
             // 尝试使用 invoke 方法作为备选
             try {
-              console.log('尝试使用 invoke 方法写入文件...');
+      
               await invoke('plugin:fs|write_file', { 
                 path: filePath, 
                 contents: jsonContent 
               });
-              console.log('使用 invoke 方法写入文件成功!');
+    
               showErrorDialog('导出历史记录成功', 'success');
             } catch (invokeError: any) {
               console.error('使用 invoke 方法写入文件失败:', invokeError);
@@ -107,7 +107,7 @@ const HistoryJsonModal: React.FC<HistoryJsonModalProps> = ({
             }
           }
         } else {
-          console.log('用户取消了保存');
+    
         }
       } catch (error: any) {
         console.error('导出失败:', error);
@@ -122,7 +122,7 @@ const HistoryJsonModal: React.FC<HistoryJsonModalProps> = ({
     if (mode === 'import') {
       try {
         setLoading(true);
-        console.log('打开文件选择对话框...');
+    
         const filePath = await open({
           title: '导入历史记录',
           filters: [{
@@ -132,7 +132,7 @@ const HistoryJsonModal: React.FC<HistoryJsonModalProps> = ({
         });
         
         if (filePath) {
-          console.log('读取文件:', filePath);
+    
           const content = await readTextFile(filePath as string);
           setJsonContent(JSON.stringify(JSON.parse(content), null, 2));
           message.success('文件加载成功，请检查内容后点击保存');

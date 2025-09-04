@@ -17,7 +17,7 @@ export async function showErrorDialog(message: string, type: 'error' | 'success'
       try {
         await invoke('show_success_dialog', { title: dialogTitle, message });
       } catch (e) {
-        console.log('成功对话框函数不存在，使用错误对话框函数代替');
+    
         await invoke('show_error_dialog', { title: dialogTitle, message });
       }
     } else {

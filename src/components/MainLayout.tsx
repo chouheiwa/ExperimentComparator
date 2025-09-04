@@ -37,6 +37,8 @@ const MainLayout: React.FC = () => {
   const [jsonModalVisible, setJsonModalVisible] = useState(false);
   const [jsonModalMode, setJsonModalMode] = useState<'export' | 'import'>('export');
   
+
+  
   // 状态
   const loading = useLoading();
   const historyRecords = useHistoryRecords();
@@ -96,11 +98,6 @@ const MainLayout: React.FC = () => {
 
   // 监听来自 Rust 后端的进度事件
   useEffect(() => {
-    // 检查是否在 Tauri 环境中
-    if (typeof window === 'undefined' || !(window as any).__TAURI__) {
-      return;
-    }
-
     const unlisten = listen('progress_update', (event) => {
       const progressData = event.payload as {
         current: number;
@@ -116,6 +113,10 @@ const MainLayout: React.FC = () => {
       unlisten.then(fn => fn());
     };
   }, [updateProgress]);
+
+
+
+
 
   const getCurrentStepIndex = () => {
     switch (location.pathname) {
@@ -221,6 +222,8 @@ const MainLayout: React.FC = () => {
             <Spin spinning={loading && !progressInfo} tip="处理中...">
               <Outlet />
             </Spin>
+            
+
           </div>
         </Content>
       </Layout>
@@ -239,7 +242,7 @@ const MainLayout: React.FC = () => {
         onClearCache={clearCache}
         onCleanupCache={cleanupCache}
         cacheMetadata={cacheMetadata}
-        onRefreshCache={refreshCacheMetadata}
+        onRefreshCache={async () => { await refreshCacheMetadata(); }}
         onGetAllCacheDetails={getAllCacheDetails}
       />
       

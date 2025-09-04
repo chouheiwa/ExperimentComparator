@@ -43,7 +43,7 @@ export const createCacheActions: StateCreator<
         my: folders.my
       };
 
-      console.log('开始检查缓存...');
+    
       
       const cachedResults: ComparisonResult[] = [];
       const missingComparisons: ComparisonFolder[] = [];
@@ -52,18 +52,18 @@ export const createCacheActions: StateCreator<
       const myResultsCache = await getCachedSingleComparison(basePaths, folders.my);
       let hasMyResults = false;
       if (myResultsCache) {
-        console.log('找到"我的结果"缓存');
+  
         cachedResults.push(...myResultsCache.results);
         hasMyResults = true;
       } else {
-        console.log('未找到"我的结果"缓存');
+  
       }
       
       // 检查每个对比文件夹的缓存
       for (const compFolder of folders.comparison) {
         const comparisonCache = await getCachedSingleComparison(basePaths, compFolder.path);
         if (comparisonCache) {
-          console.log(`找到对比文件夹"${compFolder.name}"的缓存`);
+  
           // 合并缓存结果到已有结果中
           for (const cachedResult of comparisonCache.results) {
             const existingResult = cachedResults.find(r => r.filename === cachedResult.filename);
@@ -77,7 +77,7 @@ export const createCacheActions: StateCreator<
             }
           }
         } else {
-          console.log(`未找到对比文件夹"${compFolder.name}"的缓存`);
+  
           missingComparisons.push(compFolder);
         }
       }
@@ -91,7 +91,7 @@ export const createCacheActions: StateCreator<
         });
       }
 
-      console.log(`缓存检查完成: 找到${cachedResults.length}个缓存结果，需要计算${missingComparisons.length}个对比`);
+    
       
       return { cachedResults, missingComparisons };
     } catch (error) {
@@ -137,7 +137,7 @@ export const createCacheActions: StateCreator<
             folderResults
           );
           await saveSingleComparisonCache(cacheResult);
-          console.log(`已保存缓存: ${compFolder.name}`);
+    
         }
       }
       
@@ -164,7 +164,7 @@ export const createCacheActions: StateCreator<
           myResultsData
         );
         await saveSingleComparisonCache(myResultsCacheResult);
-        console.log(`已保存缓存: 我的结果`);
+  
       }
       
       // 刷新缓存元数据
@@ -207,8 +207,10 @@ export const createCacheActions: StateCreator<
       set((state) => {
         state.cacheMetadata = metadata;
       });
+      return metadata;
     } catch (error) {
       console.error('刷新缓存元数据失败:', error);
+      return null;
     }
   },
 
@@ -220,4 +222,4 @@ export const createCacheActions: StateCreator<
       return [];
     }
   }
-}); 
+});

@@ -53,15 +53,11 @@ const ValidationPage: React.FC = () => {
     resetProgress(); // 重置进度状态
     
     try {
-      console.log('开始增量对比流程...');
-      
       // 检查缓存，获取已有结果和需要计算的对比
-      console.log('检查缓存...');
       const { cachedResults, missingComparisons } = await loadFromCacheIncremental(folders);
       
       // 如果所有对比都有缓存，直接完成
       if (missingComparisons.length === 0 && cachedResults.length > 0) {
-        console.log('所有对比都有缓存，直接使用缓存结果');
         // 设置对比结果到store
         setComparisonResults(cachedResults);
         // 保存历史记录
@@ -76,7 +72,6 @@ const ValidationPage: React.FC = () => {
       
       // 只计算缺少缓存的对比
       if (missingComparisons.length > 0) {
-        console.log(`需要计算 ${missingComparisons.length} 个对比: ${missingComparisons.map((c: any) => c.name).join(', ')}`);
         
         // 初始化进度信息
         const totalFiles = validationResult.common_files.length;
@@ -87,7 +82,7 @@ const ValidationPage: React.FC = () => {
           path: f.path
         }));
         
-        console.log('调用后端计算API...');
+
         
         try {
           const newResults = await invoke<ComparisonResult[]>('calculate_comparisons_with_progress', {
@@ -98,7 +93,7 @@ const ValidationPage: React.FC = () => {
             commonFiles: validationResult.common_files
           });
           
-          console.log('新计算完成，合并结果...');
+
           
           // 合并缓存结果和新计算结果
           if (hasPartialCache) {
@@ -129,7 +124,6 @@ const ValidationPage: React.FC = () => {
           }
           
           // 保存新计算的结果到缓存
-          console.log('保存新结果到缓存...');
           const basePaths = {
             original: folders.original,
             gt: folders.gt,
@@ -141,22 +135,9 @@ const ValidationPage: React.FC = () => {
         }
       }
       
-      console.log('设置最终结果...');
       setComparisonResults(allResults);
       
-      // 设置缓存状态
-      if (hasPartialCache && missingComparisons.length === 0) {
-        // 完全使用缓存
-        console.log('完全使用缓存结果');
-      } else if (hasPartialCache && missingComparisons.length > 0) {
-        // 部分使用缓存
-        console.log('部分使用缓存，部分新计算');
-      } else {
-        // 完全新计算
-        console.log('完全新计算结果');
-      }
-      
-      console.log('对比流程完成');
+
       
       // 保存历史记录
       addHistoryRecord(folders);
@@ -165,7 +146,6 @@ const ValidationPage: React.FC = () => {
       navigate('/comparison');
       
     } catch (err) {
-      console.error('对比计算失败:', err);
       const errorMessage = typeof err === 'string' ? err : '对比计算失败，请稍后重试';
       showErrorDialog(errorMessage);
     } finally {

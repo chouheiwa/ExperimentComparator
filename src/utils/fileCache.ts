@@ -91,18 +91,18 @@ export const getCachedSingleComparison = async (
     const cacheKey = generateSingleComparisonCacheKey(basePaths, comparisonPath);
     const cacheFilePath = await getCacheFilePath(cacheKey);
     
-    console.log('尝试获取单个对比缓存，key:', cacheKey);
+  
     
     const fileExists = await exists(cacheFilePath);
     if (!fileExists) {
-      console.log('缓存文件不存在');
+  
       return null;
     }
     
     const cacheData = await readTextFile(cacheFilePath);
     const result: CachedSingleComparison = JSON.parse(cacheData);
     
-    console.log('找到单个对比缓存结果');
+  
     
     // 更新最后访问时间
     result.lastAccessedAt = new Date().toISOString();
@@ -407,4 +407,4 @@ export const formatCacheSize = (bytes: number): string => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}; 
+};

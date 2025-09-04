@@ -252,11 +252,11 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
     }
     
     if (paths.length === 0) {
-      console.log('handleFolderDrop: 没有拖拽的路径');
+
       return;
     }
     
-    console.log('handleFolderDrop: 处理路径:', paths);
+
     
     try {
       
@@ -334,16 +334,11 @@ const FolderSelection: React.FC<FolderSelectionProps> = ({ onFoldersSelected, lo
     let unlistenDragLeave: (() => void) | undefined;
 
     const setupListeners = async () => {
-      // 检查是否在 Tauri 环境中
-      if (typeof window === 'undefined' || !(window as any).__TAURI__) {
-        return;
-      }
-
       // 监听拖放事件 - Tauri 2.0 中的正确事件名称
       unlistenDrop = await listen('tauri://drag-drop', (event) => {
         setIsDragging(false);
         try {
-          console.log('拖拽事件 payload:', event.payload);
+    
           let paths: string[];
           
           // 处理不同的 payload 格式

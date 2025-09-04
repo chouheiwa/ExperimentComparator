@@ -47,7 +47,7 @@ export interface CacheActions {
   saveToCache: (basePaths: BaseFolderPaths, comparisonFolders: ComparisonFolder[], results: ComparisonResult[]) => Promise<void>;
   clearCache: () => Promise<void>;
   cleanupCache: (maxAge?: number) => Promise<number>;
-  refreshCacheMetadata: () => Promise<void>;
+  refreshCacheMetadata: () => Promise<CacheMetadata | null>;
   getAllCacheDetails: () => Promise<CachedSingleComparison[]>;
 }
 
@@ -71,4 +71,4 @@ export const initialState: AppState = {
   cacheMetadata: null,
   isUsingCache: false,
   progressInfo: null
-}; 
+};
