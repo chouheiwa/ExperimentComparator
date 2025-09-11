@@ -230,7 +230,7 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ results, onReset }) => 
       >
         <Row gutter={[16, 16]} justify="center">
           {sortedEntries
-            .filter(([name]) => currentResult.iou_scores[name] !== undefined || currentResult.accuracy_scores[name] !== undefined)
+            .filter(([name]) => currentResult.iou_scores[name] !== undefined || currentResult.accuracy_scores[name] !== undefined || currentResult.dice_scores[name] !== undefined)
             .map(([name]) => (
               <Col key={name} xs={12} md={8} lg={6}>
                 <Card size="small" style={{ textAlign: 'center' }}>
@@ -260,6 +260,19 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ results, onReset }) => 
                         fontSize: '16px',
                         color: currentResult.accuracy_scores[name] >= 0.9 ? '#52c41a' : 
                                currentResult.accuracy_scores[name] >= 0.7 ? '#faad14' : '#ff4d4f'
+                      }}
+                    />
+                  )}
+                  {currentResult.dice_scores[name] !== undefined && (
+                    <Statistic
+                      title="Dice系数"
+                      value={currentResult.dice_scores[name] * 100}
+                      precision={2}
+                      suffix="%"
+                      valueStyle={{ 
+                        fontSize: '16px',
+                        color: currentResult.dice_scores[name] >= 0.8 ? '#52c41a' : 
+                               currentResult.dice_scores[name] >= 0.6 ? '#faad14' : '#ff4d4f'
                       }}
                     />
                   )}

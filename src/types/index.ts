@@ -8,6 +8,7 @@ export interface ComparisonResult {
   filename: string;
   iou_scores: Record<string, number>;
   accuracy_scores: Record<string, number>;
+  dice_scores: Record<string, number>;
   paths: Record<string, string>;
 }
 
@@ -55,12 +56,14 @@ export interface CachedSingleComparison {
   results: ComparisonResult[]; // 这个对比文件夹的所有文件结果
   createdAt: string;
   lastAccessedAt: string;
+  version: string; // 应用版本号
 }
 
 export interface CacheMetadata {
   totalSize: number;
   count: number;
   lastCleanup: string;
+  version: string; // 应用版本号
 }
 
 export type Step = 'folder-selection' | 'validation' | 'comparison';
@@ -84,4 +87,4 @@ export interface AppState {
   cacheMetadata: CacheMetadata | null; // 缓存元数据
   isUsingCache: boolean; // 当前结果是否来自缓存
   progressInfo: ProgressInfo | null; // 进度信息
-} 
+}

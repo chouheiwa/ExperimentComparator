@@ -20,6 +20,7 @@ struct ComparisonResult {
     filename: String,
     iou_scores: HashMap<String, f64>,
     accuracy_scores: HashMap<String, f64>,
+    dice_scores: HashMap<String, f64>,
     paths: HashMap<String, String>,
 }
 
@@ -85,13 +86,6 @@ fn calculate_iou(img1_path: &str, img2_path: &str, _window: Option<&tauri::Windo
     let (width1, height1) = img1.dimensions();
     let (width2, height2) = img2.dimensions();
 
-    // 检查图像尺寸是否一致
-    if width1 != width2 || height1 != height2 {
-        let log_message = format!("[IOU计算] 图像尺寸不一致: 图片1 {}x{}, 图片2 {}x{} | 图片1: {} | 图片2: {} | 将调整到统一尺寸: {}x{}", 
-            width1, height1, width2, height2, img1_path, img2_path, width1.min(width2), height1.min(height2));
-        println!("{}", log_message);
-    }
-
     // 处理图像尺寸不一致的情况：将大的图像压缩到小的图像尺寸
     let (target_width, target_height) = (
         width1.min(width2),
@@ -145,13 +139,6 @@ fn calculate_accuracy(img1_path: &str, img2_path: &str, _window: Option<&tauri::
     let (width1, height1) = img1.dimensions();
     let (width2, height2) = img2.dimensions();
 
-    // 检查图像尺寸是否一致
-    if width1 != width2 || height1 != height2 {
-        let log_message = format!("[准确率计算] 图像尺寸不一致: 图片1 {}x{}, 图片2 {}x{} | 图片1: {} | 图片2: {} | 将调整到统一尺寸: {}x{}", 
-            width1, height1, width2, height2, img1_path, img2_path, width1.min(width2), height1.min(height2));
-        println!("{}", log_message);
-    }
-
     // 处理图像尺寸不一致的情况：将大的图像压缩到小的图像尺寸
     let (target_width, target_height) = (
         width1.min(width2),
@@ -189,6 +176,75 @@ fn calculate_accuracy(img1_path: &str, img2_path: &str, _window: Option<&tauri::
     }
 
     Ok(correct_pixels as f64 / total_pixels as f64)
+}
+
+// 计算两个图片的Dice系数
+fn calculate_dice(img1_path: &str, img2_path: &str, _window: Option<&tauri::Window>) -> Result<f64, String> {
+    let img1 = image::open(img1_path).map_err(|e| format!("无法打开图片1: {}", e))?;
+    let img2 = image::open(img2_path).map_err(|e| format!("无法打开图片2: {}", e))?;
+
+    let (width1, height1) = img1.dimensions();
+    let (width2, height2) = img2.dimensions();
+
+    // 检查图像尺寸是否一致
+    if width1 != width2 || height1 != height2 {
+        let log_message = format!("[Dice系数计算] 图像尺寸不一致: 图片1 {}x{}, 图片2 {}x{} | 图片1: {} | 图片2: {} | 将调整到统一尺寸: {}x{}", 
+            width1, height1, width2, height2, img1_path, img2_path, width1.min(width2), height1.min(height2));
+        println!("{}", log_message);
+    }
+
+    // 处理图像尺寸不一致的情况：将大的图像压缩到小的图像尺寸
+    let (target_width, target_height) = (
+        width1.min(width2),
+        height1.min(height2)
+    );
+
+    let img1_processed = if width1 != target_width || height1 != target_height {
+        img1.resize(target_width, target_height, image::imageops::FilterType::Lanczos3)
+    } else {
+        img1
+    };
+
+    let img2_processed = if width2 != target_width || height2 != target_height {
+        img2.resize(target_width, target_height, image::imageops::FilterType::Lanczos3)
+    } else {
+        img2
+    };
+
+    let img1_gray = img1_processed.to_luma8();
+    let img2_gray = img2_processed.to_luma8();
+
+    let mut intersection = 0u32;
+    let mut img1_foreground = 0u32;
+    let mut img2_foreground = 0u32;
+
+    for y in 0..target_height {
+        for x in 0..target_width {
+            let pixel1 = img1_gray.get_pixel(x, y)[0] > 128;
+            let pixel2 = img2_gray.get_pixel(x, y)[0] > 128;
+
+            if pixel1 {
+                img1_foreground += 1;
+            }
+            if pixel2 {
+                img2_foreground += 1;
+            }
+            if pixel1 && pixel2 {
+                intersection += 1;
+            }
+        }
+    }
+
+    // Dice系数公式: 2 * |A ∩ B| / (|A| + |B|)
+    let dice_coefficient = if img1_foreground + img2_foreground == 0 {
+        1.0 // 如果两个图像都没有前景像素，认为完全匹配
+    } else {
+        (2.0 * intersection as f64) / (img1_foreground + img2_foreground) as f64
+    };
+
+
+
+    Ok(dice_coefficient)
 }
 
 #[tauri::command]
@@ -326,6 +382,7 @@ async fn calculate_comparisons_with_progress(
 
         let mut iou_scores = HashMap::new();
         let mut accuracy_scores = HashMap::new();
+        let mut dice_scores = HashMap::new();
         let mut paths = HashMap::new();
 
         // 添加原始图片、GT和我的实验数据路径
@@ -351,6 +408,16 @@ async fn calculate_comparisons_with_progress(
             Err(e) => {
                 eprintln!("计算准确率失败: {}", e);
                 accuracy_scores.insert("我的结果".to_string(), 0.0);
+            }
+        }
+
+        match calculate_dice(&gt_path, &my_path, Some(&window)) {
+            Ok(dice) => {
+                dice_scores.insert("我的结果".to_string(), dice);
+            }
+            Err(e) => {
+                eprintln!("计算Dice系数失败: {}", e);
+                dice_scores.insert("我的结果".to_string(), 0.0);
             }
         }
 
@@ -382,12 +449,24 @@ async fn calculate_comparisons_with_progress(
                     accuracy_scores.insert(comp_name.clone(), 0.0);
                 }
             }
+
+            // 计算Dice系数
+            match calculate_dice(&gt_path, &comp_path, Some(&window)) {
+                Ok(dice) => {
+                    dice_scores.insert(comp_name.clone(), dice);
+                }
+                Err(e) => {
+                    eprintln!("计算Dice系数失败: {}", e);
+                    dice_scores.insert(comp_name.clone(), 0.0);
+                }
+            }
         }
 
         results.push(ComparisonResult {
             filename: filename.clone(),
             iou_scores,
             accuracy_scores,
+            dice_scores,
             paths,
         });
     }
@@ -424,6 +503,7 @@ async fn calculate_comparisons(
 
         let mut iou_scores = HashMap::new();
         let mut accuracy_scores = HashMap::new();
+        let mut dice_scores = HashMap::new();
         let mut paths = HashMap::new();
 
         // 添加原始图片、GT和我的实验数据路径
@@ -449,6 +529,16 @@ async fn calculate_comparisons(
             Err(e) => {
                 eprintln!("计算准确率失败: {}", e);
                 accuracy_scores.insert("我的结果".to_string(), 0.0);
+            }
+        }
+
+        match calculate_dice(&gt_path, &my_path, None) {
+            Ok(dice) => {
+                dice_scores.insert("我的结果".to_string(), dice);
+            }
+            Err(e) => {
+                eprintln!("计算Dice系数失败: {}", e);
+                dice_scores.insert("我的结果".to_string(), 0.0);
             }
         }
 
@@ -480,12 +570,24 @@ async fn calculate_comparisons(
                     accuracy_scores.insert(comp_name.clone(), 0.0);
                 }
             }
+
+            // 计算Dice系数
+            match calculate_dice(&gt_path, &comp_path, None) {
+                Ok(dice) => {
+                    dice_scores.insert(comp_name.clone(), dice);
+                }
+                Err(e) => {
+                    eprintln!("计算Dice系数失败: {}", e);
+                    dice_scores.insert(comp_name.clone(), 0.0);
+                }
+            }
         }
 
         results.push(ComparisonResult {
             filename,
             iou_scores,
             accuracy_scores,
+            dice_scores,
             paths,
         });
     }

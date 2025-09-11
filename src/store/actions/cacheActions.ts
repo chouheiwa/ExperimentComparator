@@ -68,9 +68,10 @@ export const createCacheActions: StateCreator<
           for (const cachedResult of comparisonCache.results) {
             const existingResult = cachedResults.find(r => r.filename === cachedResult.filename);
             if (existingResult) {
-              // 合并IOU和准确率分数
+              // 合并IOU、准确率和Dice系数分数
               existingResult.iou_scores = { ...existingResult.iou_scores, ...cachedResult.iou_scores };
               existingResult.accuracy_scores = { ...existingResult.accuracy_scores, ...cachedResult.accuracy_scores };
+              existingResult.dice_scores = { ...existingResult.dice_scores, ...cachedResult.dice_scores };
               existingResult.paths = { ...existingResult.paths, ...cachedResult.paths };
             } else {
               cachedResults.push(cachedResult);
@@ -118,6 +119,7 @@ export const createCacheActions: StateCreator<
           ...result,
           iou_scores: { [compFolder.name]: result.iou_scores[compFolder.name] },
           accuracy_scores: { [compFolder.name]: result.accuracy_scores[compFolder.name] },
+          dice_scores: { [compFolder.name]: result.dice_scores[compFolder.name] },
           paths: { 
             '原始图片': result.paths['原始图片'],
             'GT': result.paths['GT'],
@@ -126,7 +128,8 @@ export const createCacheActions: StateCreator<
           }
         })).filter(result => 
           result.iou_scores[compFolder.name] !== undefined || 
-          result.accuracy_scores[compFolder.name] !== undefined
+          result.accuracy_scores[compFolder.name] !== undefined ||
+          result.dice_scores[compFolder.name] !== undefined
         );
         
         if (folderResults.length > 0) {
@@ -143,18 +146,20 @@ export const createCacheActions: StateCreator<
       
       // 同时为"我的结果"创建缓存记录
       const myResultsData = results.map(result => ({
-        ...result,
-        iou_scores: { '我的结果': result.iou_scores['我的结果'] },
-        accuracy_scores: { '我的结果': result.accuracy_scores['我的结果'] },
+          ...result,
+          iou_scores: { '我的结果': result.iou_scores['我的结果'] },
+          accuracy_scores: { '我的结果': result.accuracy_scores['我的结果'] },
+          dice_scores: { '我的结果': result.dice_scores['我的结果'] },
         paths: { 
           '原始图片': result.paths['原始图片'],
           'GT': result.paths['GT'],
           '我的结果': result.paths['我的结果']
         }
       })).filter(result => 
-        result.iou_scores['我的结果'] !== undefined || 
-        result.accuracy_scores['我的结果'] !== undefined
-      );
+          result.iou_scores['我的结果'] !== undefined || 
+          result.accuracy_scores['我的结果'] !== undefined ||
+          result.dice_scores['我的结果'] !== undefined
+        );
       
       if (myResultsData.length > 0) {
         const myResultsCacheResult = createSingleComparisonCache(

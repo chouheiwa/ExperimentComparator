@@ -109,9 +109,10 @@ const ValidationPage: React.FC = () => {
             newResults.forEach(newResult => {
               if (fileResultMap.has(newResult.filename)) {
                 const existingResult = fileResultMap.get(newResult.filename)!;
-                // 合并IOU和准确率分数以及路径
+                // 合并IOU、准确率、Dice系数分数以及路径
                 Object.assign(existingResult.iou_scores, newResult.iou_scores);
                 Object.assign(existingResult.accuracy_scores, newResult.accuracy_scores);
+                Object.assign(existingResult.dice_scores, newResult.dice_scores);
                 Object.assign(existingResult.paths, newResult.paths);
               } else {
                 fileResultMap.set(newResult.filename, { ...newResult });

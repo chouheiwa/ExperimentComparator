@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Card, Row, Col, Select, Switch, Button, Space, Typography, Tag, Modal, message } from 'antd';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Card, Row, Col, Select, Switch, Button, Space, Typography, Tag, Modal, message, Spin } from 'antd';
 import { DownloadOutlined, StarOutlined, StarFilled } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/core';
 import { showErrorDialog } from '../utils/errorDialog';
@@ -15,8 +15,8 @@ interface AnalysisViewProps {
   onReset: () => void;
 }
 
-type SortBy = 'filename' | 'avg_iou' | 'max_iou' | 'min_iou' | 'iou_variance' | 'avg_accuracy' | 'my_advantage';
-type FilterBy = 'all' | 'best' | 'worst' | 'typical' | 'high_variance' | 'marked' | 'my_advantage';
+type SortBy = 'my_advantage';
+type MetricType = 'iou' | 'accuracy' | 'dice';
 
 interface CaseAnalysis {
   filename: string;
@@ -25,16 +25,25 @@ interface CaseAnalysis {
   minIou: number;
   iouVariance: number;
   avgAccuracy: number;
+  avgDice: number;
+  maxDice: number;
+  minDice: number;
+  diceVariance: number;
   myAdvantage: number; // 我的方法相对于其他方法的优势
   myIou: number; // 我的方法的IOU
   othersAvgIou: number; // 其他方法的平均IOU
+  myDice: number; // 我的方法的Dice系数
+  othersAvgDice: number; // 其他方法的平均Dice系数
   category: 'best' | 'worst' | 'typical' | 'high_variance' | 'my_advantage';
 }
 
 const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
-  const [sortBy, setSortBy] = useState<SortBy>('my_advantage');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [filterBy, setFilterBy] = useState<FilterBy>('my_advantage');
+  const [selectedMetric, setSelectedMetric] = useState<MetricType>('iou');
+  const [sortedData, setSortedData] = useState<CaseAnalysis[]>([]);
+  const [isSorting, setIsSorting] = useState(false);
+  // 排序方式
+  const [sortBy, setSortBy] = useState<SortBy>('my_advantage');
   const [isGridView, setIsGridView] = useState(false);
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const [markedImages, setMarkedImages] = useState<Set<string>>(new Set());
@@ -45,15 +54,22 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
     return results.map(result => {
       const iouValues = Object.values(result.iou_scores).filter(v => v !== undefined);
       const accValues = Object.values(result.accuracy_scores).filter(v => v !== undefined);
+      const diceValues = Object.values(result.dice_scores || {}).filter(v => v !== undefined);
       
       const avgIou = iouValues.length > 0 ? iouValues.reduce((a, b) => a + b, 0) / iouValues.length : 0;
       const maxIou = iouValues.length > 0 ? Math.max(...iouValues) : 0;
       const minIou = iouValues.length > 0 ? Math.min(...iouValues) : 0;
       const avgAccuracy = accValues.length > 0 ? accValues.reduce((a, b) => a + b, 0) / accValues.length : 0;
       
+      const avgDice = diceValues.length > 0 ? diceValues.reduce((a, b) => a + b, 0) / diceValues.length : 0;
+      const maxDice = diceValues.length > 0 ? Math.max(...diceValues) : 0;
+      const minDice = diceValues.length > 0 ? Math.min(...diceValues) : 0;
+      
       // 计算方差
       const iouVariance = iouValues.length > 1 ? 
         iouValues.reduce((sum, val) => sum + Math.pow(val - avgIou, 2), 0) / iouValues.length : 0;
+      const diceVariance = diceValues.length > 1 ? 
+        diceValues.reduce((sum, val) => sum + Math.pow(val - avgDice, 2), 0) / diceValues.length : 0;
       
       // 计算我的方法优势
       const myIou = result.iou_scores['我的结果'] || 0;
@@ -62,10 +78,26 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
         .map(([, value]) => value);
       const othersAvgIou = otherIouValues.length > 0 ? 
         otherIouValues.reduce((a, b) => a + b, 0) / otherIouValues.length : 0;
+      
+      const myDice = result.dice_scores?.['我的结果'] || 0;
+      const otherDiceValues = Object.entries(result.dice_scores || {})
+        .filter(([name, value]) => name !== '我的结果' && value !== undefined)
+        .map(([, value]) => value);
+      const othersAvgDice = otherDiceValues.length > 0 ? 
+        otherDiceValues.reduce((a, b) => a + b, 0) / otherDiceValues.length : 0;
+      
       const myAdvantage = myIou - othersAvgIou;
       
-      // 分类
+      // 分类 - 根据选定的指标进行分类
       let category: CaseAnalysis['category'] = 'typical';
+      
+      // 根据选定指标计算优势和阈值
+      let currentMetricAdvantage = myAdvantage;
+      let currentMetricAvg = avgIou;
+      let currentMetricVariance = iouVariance;
+      let myCurrentMetric = myIou;
+      
+      // 这里暂时使用IOU作为主要分类依据，后续可以根据selectedMetric动态调整
       if (myAdvantage > 0.2 && myIou > 0.6) category = 'my_advantage'; // 我的方法明显优于其他方法
       else if (avgIou >= 0.8) category = 'best';
       else if (avgIou <= 0.3) category = 'worst';
@@ -78,73 +110,65 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
         minIou,
         iouVariance,
         avgAccuracy,
+        avgDice,
+        maxDice,
+        minDice,
+        diceVariance,
         myAdvantage,
         myIou,
         othersAvgIou,
+        myDice,
+        othersAvgDice,
         category
       };
     });
-  }, [results]);
+  }, [results, selectedMetric]);
 
-  // 排序和过滤
-  const filteredAndSortedData = useMemo(() => {
-    let filtered = analysisData;
-    
-    // 过滤
-    switch (filterBy) {
-      case 'best':
-        filtered = filtered.filter(d => d.category === 'best');
-        break;
-      case 'worst':
-        filtered = filtered.filter(d => d.category === 'worst');
-        break;
-      case 'typical':
-        filtered = filtered.filter(d => d.category === 'typical');
-        break;
-      case 'high_variance':
-        filtered = filtered.filter(d => d.category === 'high_variance');
-        break;
-      case 'my_advantage':
-        filtered = filtered.filter(d => d.category === 'my_advantage');
-        break;
-      case 'marked':
-        filtered = filtered.filter(d => markedImages.has(d.filename));
-        break;
-    }
-    
-    // 排序
-    filtered.sort((a, b) => {
-      let aVal: number, bVal: number;
-      switch (sortBy) {
-        case 'filename':
-          return sortOrder === 'asc' ? a.filename.localeCompare(b.filename) : b.filename.localeCompare(a.filename);
-        case 'avg_iou':
-          aVal = a.avgIou; bVal = b.avgIou; break;
-        case 'max_iou':
-          aVal = a.maxIou; bVal = b.maxIou; break;
-        case 'min_iou':
-          aVal = a.minIou; bVal = b.minIou; break;
-        case 'iou_variance':
-          aVal = a.iouVariance; bVal = b.iouVariance; break;
-        case 'avg_accuracy':
-          aVal = a.avgAccuracy; bVal = b.avgAccuracy; break;
-        case 'my_advantage':
-          aVal = a.myAdvantage; bVal = b.myAdvantage; break;
-        default:
-          aVal = a.avgIou; bVal = b.avgIou;
-      }
-      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+  // 异步排序函数
+  const performAsyncSort = async (data: CaseAnalysis[], sortBy: SortBy, sortOrder: 'asc' | 'desc') => {
+    return new Promise<CaseAnalysis[]>((resolve) => {
+      setTimeout(() => {
+        const sorted = [...data];
+        sorted.sort((a, b) => {
+          let aVal: number, bVal: number;
+          switch (sortBy) {
+            case 'my_advantage':
+              aVal = a.myAdvantage; bVal = b.myAdvantage; break;
+            default:
+              aVal = a.myAdvantage; bVal = b.myAdvantage;
+          }
+          return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+        });
+        resolve(sorted);
+      }, 0);
     });
-    
-    return filtered;
-  }, [analysisData, sortBy, sortOrder, filterBy, markedImages]);
+  };
+
+  // 异步排序效果
+  useEffect(() => {
+    const sortData = async () => {
+      if (analysisData.length === 0) return;
+      
+      setIsSorting(true);
+      try {
+        const sorted = await performAsyncSort(analysisData, sortBy, sortOrder);
+        setSortedData(sorted);
+      } catch (error) {
+        console.error('排序失败:', error);
+      } finally {
+        setIsSorting(false);
+      }
+    };
+
+    sortData();
+  }, [analysisData, sortBy, sortOrder]);
 
   // 获取当前显示的结果
   const displayResults = useMemo(() => {
-    return filteredAndSortedData.map(analysis => 
+    return sortedData.map(analysis => 
       results.find(r => r.filename === analysis.filename)!
     );
-  }, [filteredAndSortedData, results]);
+  }, [sortedData, results]);
 
   // 切换图像标记
   const toggleMark = (filename: string) => {
@@ -224,7 +248,23 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
       {/* 控制面板 */}
       <Card style={{ marginBottom: '24px' }}>
         <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} md={6}>
+          <Col xs={24} md={5}>
+            <Space direction="vertical" size="small" style={{ width: '100%' }}>
+              <Text strong>评估指标</Text>
+              <Select 
+                value={selectedMetric} 
+                onChange={setSelectedMetric}
+                style={{ width: '100%' }}
+                size="small"
+              >
+                <Option value="iou">IOU</Option>
+                <Option value="accuracy">准确率</Option>
+                <Option value="dice">Dice系数</Option>
+              </Select>
+            </Space>
+          </Col>
+          
+          <Col xs={24} md={5}>
             <Space direction="vertical" size="small" style={{ width: '100%' }}>
               <Text strong>排序方式</Text>
               <Select 
@@ -233,33 +273,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
                 style={{ width: '100%' }}
                 size="small"
               >
-                <Option value="filename">文件名</Option>
-                <Option value="avg_iou">平均IOU</Option>
-                <Option value="max_iou">最高IOU</Option>
-                <Option value="min_iou">最低IOU</Option>
-                <Option value="iou_variance">IOU方差</Option>
-                <Option value="avg_accuracy">平均准确率</Option>
-                <Option value="my_advantage">我的优势度</Option>
-              </Select>
-            </Space>
-          </Col>
-          
-          <Col xs={24} md={6}>
-            <Space direction="vertical" size="small" style={{ width: '100%' }}>
-              <Text strong>过滤条件</Text>
-              <Select 
-                value={filterBy} 
-                onChange={setFilterBy}
-                style={{ width: '100%' }}
-                size="small"
-              >
-                <Option value="all">全部图像</Option>
-                <Option value="my_advantage">我的优势案例</Option>
-                <Option value="best">最佳案例</Option>
-                <Option value="worst">最差案例</Option>
-                <Option value="typical">典型案例</Option>
-                <Option value="high_variance">高方差案例</Option>
-                <Option value="marked">已标记图像</Option>
+                <Option value="my_advantage">优势度</Option>
               </Select>
             </Space>
           </Col>
@@ -313,17 +327,14 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
               {markedImages.size > 0 && ` · 已标记 ${markedImages.size} 个`}
               {selectedImages.size > 0 && ` · 已选中 ${selectedImages.size} 个`}
             </Text>
-            {filterBy === 'my_advantage' && (
-              <Text type="secondary" style={{ marginLeft: '12px' }}>
-                · 💡 正在显示你的方法明显优于其他方法的案例（优势 &gt; 20%）
-              </Text>
-            )}
+
           </Col>
         </Row>
       </Card>
 
       {/* 图像展示区域 */}
-      <Row gutter={[16, 16]}>
+      <Spin spinning={isSorting} tip="正在排序...">
+        <Row gutter={[16, 16]}>
         {displayResults.map((result) => {
           const analysis = analysisData.find(a => a.filename === result.filename)!;
           
@@ -373,12 +384,14 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
                   showPreviewButton={true}
                   showStatistics={true}
                   statisticsPosition="top"
+                  selectedMetric={selectedMetric}
                 />
               </Card>
             </Col>
           );
         })}
-      </Row>
+        </Row>
+      </Spin>
 
       {/* 图像预览模态框 */}
       <Modal

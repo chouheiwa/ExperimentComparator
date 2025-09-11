@@ -12,6 +12,7 @@ import {
   CacheMetadata, 
   BaseFolderPaths 
 } from '../types';
+import { getAppVersion } from './version';
 
 // 缓存目录和文件配置
 const CACHE_DIR_NAME = 'experiment_cache';
@@ -135,7 +136,8 @@ export const createSingleComparisonCache = (
   basePaths: BaseFolderPaths,
   comparisonName: string,
   comparisonPath: string,
-  results: any[]
+  results: any[],
+  version: string = getAppVersion()
 ): CachedSingleComparison => {
   const cacheKey = generateSingleComparisonCacheKey(basePaths, comparisonPath);
   const now = new Date().toISOString();
@@ -147,7 +149,8 @@ export const createSingleComparisonCache = (
     comparisonPath,
     results,
     createdAt: now,
-    lastAccessedAt: now
+    lastAccessedAt: now,
+    version
   };
 };
 
@@ -290,7 +293,8 @@ export const getCacheMetadata = async (): Promise<CacheMetadata> => {
   return {
     totalSize: 0,
     count: 0,
-    lastCleanup: new Date().toISOString()
+    lastCleanup: new Date().toISOString(),
+    version: getAppVersion()
   };
 };
 
@@ -306,7 +310,8 @@ const updateCacheMetadata = async (): Promise<void> => {
       const metadata: CacheMetadata = {
         totalSize: 0,
         count: 0,
-        lastCleanup: new Date().toISOString()
+        lastCleanup: new Date().toISOString(),
+        version: getAppVersion()
       };
       
       const metadataPath = await getCacheMetadataPath();
@@ -336,7 +341,8 @@ const updateCacheMetadata = async (): Promise<void> => {
     const metadata: CacheMetadata = {
       totalSize,
       count,
-      lastCleanup: currentMetadata.lastCleanup
+      lastCleanup: currentMetadata.lastCleanup,
+      version: getAppVersion()
     };
     
     const metadataPath = await getCacheMetadataPath();

@@ -13,6 +13,7 @@ import {
   BaseFolderPaths,
   ComparisonResult
 } from '../types';
+import { getAppVersion } from './version';
 
 // 缓存目录和文件配置
 const CACHE_DIR_NAME = 'experiment_cache_v2';
@@ -141,7 +142,20 @@ export const getCachedSingleComparison = async (
     const cacheData = await readTextFile(cacheFilePath);
     const result: CachedSingleComparison = JSON.parse(cacheData);
     
-  
+    // 版本号验证
+    const currentVersion = getAppVersion();
+    if (!result.version || result.version !== currentVersion) {
+      console.log(`缓存版本不匹配，当前版本: ${currentVersion}, 缓存版本: ${result.version || '未知'}，清理缓存`);
+      // 删除不匹配版本的缓存文件
+      await remove(cacheFilePath);
+      // 从索引中移除该条目
+      gtEntry.comparisons = gtEntry.comparisons.filter(comp => comp.fileName !== comparisonEntry.fileName);
+      if (gtEntry.comparisons.length === 0) {
+        delete gtIndex[gtHash];
+      }
+      await saveGTIndex(gtIndex);
+      return null;
+    }
     
     // 更新访问时间
     comparisonEntry.lastAccessed = new Date().toISOString();
@@ -217,7 +231,8 @@ export const createSingleComparisonCache = (
   basePaths: BaseFolderPaths,
   comparisonName: string,
   comparisonPath: string,
-  results: ComparisonResult[]
+  results: any[],
+  version: string = getAppVersion()
 ): CachedSingleComparison => {
   const cacheKey = generateCacheFileName(basePaths.gt, comparisonPath);
   const now = new Date().toISOString();
@@ -229,7 +244,8 @@ export const createSingleComparisonCache = (
     comparisonPath,
     results,
     createdAt: now,
-    lastAccessedAt: now
+    lastAccessedAt: now,
+    version
   };
 };
 
@@ -429,7 +445,8 @@ export const getCacheMetadata = async (): Promise<CacheMetadata> => {
     const metadata: CacheMetadata = {
       totalSize,
       count,
-      lastCleanup
+      lastCleanup,
+      version: getAppVersion()
     };
     
     // 保存元数据
@@ -439,10 +456,11 @@ export const getCacheMetadata = async (): Promise<CacheMetadata> => {
   } catch (error) {
     console.error('获取缓存元数据失败:', error);
     return {
-      totalSize: 0,
-      count: 0,
-      lastCleanup: new Date().toISOString()
-    };
+          totalSize: 0,
+          count: 0,
+          lastCleanup: new Date().toISOString(),
+          version: getAppVersion()
+        };
   }
 };
 

@@ -10,6 +10,11 @@ export const formatIou = (iou: number): string => {
   return (iou * 100).toFixed(2) + '%';
 };
 
+// 通用的评估指标格式化函数
+export const formatMetric = (value: number): string => {
+  return (value * 100).toFixed(2) + '%';
+};
+
 export const getStepTitle = (step: Step): string => {
   switch (step) {
     case 'folder-selection':
@@ -29,6 +34,13 @@ export const getIouStatus = (iou: number): 'success' | 'warning' | 'error' => {
   return 'error';
 };
 
+// 通用的评估指标状态函数
+export const getMetricStatus = (value: number): 'success' | 'warning' | 'error' => {
+  if (value >= 0.7) return 'success';
+  if (value >= 0.4) return 'warning';
+  return 'error';
+};
+
 // 重新导出优化的文件缓存函数
 export {
   generateBaseCacheKey,
@@ -45,6 +57,9 @@ export {
   formatCacheSize,
   getAllCacheDetails
 } from './optimizedFileCache';
+
+// 导出版本工具函数
+export { getAppVersion, DEFAULT_VERSION } from './version';
 
 // 导入函数以便在向后兼容的函数中使用
 import { generateBaseCacheKey } from './optimizedFileCache';
