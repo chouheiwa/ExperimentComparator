@@ -18,7 +18,7 @@ import {
   ImportOutlined, 
   EditOutlined, 
   DeleteOutlined,
-  EyeOutlined,
+  PlayCircleOutlined,
   SaveOutlined,
   CloseOutlined
 } from '@ant-design/icons';
@@ -151,19 +151,28 @@ const HistoryManagement: React.FC<HistoryManagementProps> = ({
           dataSource={historyRecords}
           renderItem={(record) => (
             <List.Item
-              style={{ padding: '12px 0', borderBottom: '1px solid #f0f0f0' }}
-              actions={[
-                onView && (
-                  <Tooltip title="查看详情">
-                    <Button
-                      icon={<EyeOutlined />}
-                      onClick={() => onView(record)}
-                      size="small"
-                      type="text"
-                    />
-                  </Tooltip>
-                ),
-                onEdit && (
+              style={{ padding: '12px 0', borderBottom: '1px solid #f0f0f0', position: 'relative' }}
+            >
+              {/* 右上角按钮组 */}
+              <div style={{ 
+                position: 'absolute', 
+                top: '12px', 
+                right: '0px', 
+                display: 'flex', 
+                gap: '4px',
+                zIndex: 1
+              }}>
+                {onView && (
+                   <Tooltip title="使用">
+                     <Button
+                       icon={<PlayCircleOutlined />}
+                       onClick={() => onView(record)}
+                       size="small"
+                       type="text"
+                     />
+                   </Tooltip>
+                 )}
+                {onEdit && (
                   <Tooltip title="编辑">
                     <Button
                       icon={<EditOutlined />}
@@ -172,8 +181,8 @@ const HistoryManagement: React.FC<HistoryManagementProps> = ({
                       type="text"
                     />
                   </Tooltip>
-                ),
-                onDelete && (
+                )}
+                {onDelete && (
                   <Popconfirm
                     title="删除历史记录"
                     description="确定要删除这条历史记录吗？"
@@ -191,12 +200,12 @@ const HistoryManagement: React.FC<HistoryManagementProps> = ({
                       />
                     </Tooltip>
                   </Popconfirm>
-                )
-              ].filter(Boolean)}
-            >
+                )}
+              </div>
+              
               <List.Item.Meta
                 title={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '120px' }}>
                     <Text strong style={{ fontSize: '14px' }}>{record.name}</Text>
                     <Tag color="blue" style={{ fontSize: '10px' }}>
                       历史记录
@@ -204,7 +213,7 @@ const HistoryManagement: React.FC<HistoryManagementProps> = ({
                   </div>
                 }
                 description={
-                  <div style={{ fontSize: '12px', color: '#666' }}>
+                  <div style={{ fontSize: '12px', color: '#666', paddingRight: '120px' }}>
                     {record.description && (
                       <div style={{ marginBottom: '4px' }}>{record.description}</div>
                     )}

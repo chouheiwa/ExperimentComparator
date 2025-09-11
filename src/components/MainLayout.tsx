@@ -94,6 +94,7 @@ const MainLayout: React.FC = () => {
 
   const handleHistoryView = (record: HistoryRecord) => {
     loadHistoryRecord(record);
+    closeDrawer();
   };
 
   // 监听来自 Rust 后端的进度事件
