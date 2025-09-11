@@ -10,8 +10,7 @@ import { appDataDir, join } from '@tauri-apps/api/path';
 import { 
   CachedSingleComparison, 
   CacheMetadata, 
-  BaseFolderPaths,
-  ComparisonResult
+  BaseFolderPaths
 } from '../types';
 import { getAppVersion } from './version';
 

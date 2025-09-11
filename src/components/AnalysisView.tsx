@@ -92,10 +92,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ results, onReset }) => {
       let category: CaseAnalysis['category'] = 'typical';
       
       // 根据选定指标计算优势和阈值
-      let currentMetricAdvantage = myAdvantage;
-      let currentMetricAvg = avgIou;
-      let currentMetricVariance = iouVariance;
-      let myCurrentMetric = myIou;
+      // 这里暂时使用IOU作为主要分类依据，后续可以根据selectedMetric动态调整
       
       // 这里暂时使用IOU作为主要分类依据，后续可以根据selectedMetric动态调整
       if (myAdvantage > 0.2 && myIou > 0.6) category = 'my_advantage'; // 我的方法明显优于其他方法

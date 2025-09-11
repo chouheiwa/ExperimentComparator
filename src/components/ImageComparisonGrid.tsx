@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Tag, Button, Typography, Statistic, Space } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { ComparisonResult } from '../types';
-import { formatIou, getIouStatus, formatMetric, getMetricStatus } from '../utils';
+import { formatMetric, getMetricStatus } from '../utils';
 import SafeImage from './SafeImage';
 
 const { Text } = Typography;
