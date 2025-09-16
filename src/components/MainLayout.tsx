@@ -22,6 +22,7 @@ import {
 import SideDrawer, { DrawerType } from './SideDrawer';
 import HistoryJsonModal from './HistoryJsonModal';
 import { HistoryRecord } from '../types';
+import { getAppVersion } from '../utils/version';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -161,7 +162,7 @@ const MainLayout: React.FC = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-              实验结果对比工具
+              实验结果对比工具 v{getAppVersion()}
             </Title>
             {location.pathname === '/comparison' && isUsingCache && (
               <Alert

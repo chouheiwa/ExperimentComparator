@@ -1,6 +1,6 @@
 {
   "name": "experiment-comparator",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "A modern desktop application for comparing machine learning model experiment results",
   "type": "module",
   "scripts": {
@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.7.1",
+    "@types/node": "^20.19.15",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.3",

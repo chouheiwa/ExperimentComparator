@@ -376,9 +376,9 @@ async fn calculate_comparisons_with_progress(
             eprintln!("发送进度事件失败: {}", e);
         }
 
-        let original_path = format!("{}/{}", original_folder, filename);
-        let gt_path = format!("{}/{}", gt_folder, filename);
-        let my_path = format!("{}/{}", my_folder, filename);
+        let original_path = Path::new(&original_folder).join(filename).to_string_lossy().to_string();
+        let gt_path = Path::new(&gt_folder).join(filename).to_string_lossy().to_string();
+        let my_path = Path::new(&my_folder).join(filename).to_string_lossy().to_string();
 
         let mut iou_scores = HashMap::new();
         let mut accuracy_scores = HashMap::new();
@@ -423,7 +423,7 @@ async fn calculate_comparisons_with_progress(
 
         // 计算对比数据与GT的IOU和准确率
         for comp_folder in comparison_folders.iter() {
-            let comp_path = format!("{}/{}", comp_folder.path, filename);
+            let comp_path = Path::new(&comp_folder.path).join(filename).to_string_lossy().to_string();
             let comp_name = comp_folder.name.clone();
 
             paths.insert(comp_name.clone(), comp_path.clone());
@@ -497,9 +497,9 @@ async fn calculate_comparisons(
     let mut results = Vec::new();
 
     for filename in common_files {
-        let original_path = format!("{}/{}", original_folder, filename);
-        let gt_path = format!("{}/{}", gt_folder, filename);
-        let my_path = format!("{}/{}", my_folder, filename);
+        let original_path = Path::new(&original_folder).join(&filename).to_string_lossy().to_string();
+        let gt_path = Path::new(&gt_folder).join(&filename).to_string_lossy().to_string();
+        let my_path = Path::new(&my_folder).join(&filename).to_string_lossy().to_string();
 
         let mut iou_scores = HashMap::new();
         let mut accuracy_scores = HashMap::new();
@@ -544,7 +544,7 @@ async fn calculate_comparisons(
 
         // 计算对比数据与GT的IOU和准确率
         for comp_folder in comparison_folders.iter() {
-            let comp_path = format!("{}/{}", comp_folder.path, filename);
+            let comp_path = Path::new(&comp_folder.path).join(&filename).to_string_lossy().to_string();
             let comp_name = comp_folder.name.clone();
 
             paths.insert(comp_name.clone(), comp_path.clone());
